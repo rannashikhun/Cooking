@@ -1,0 +1,244 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
+    --font-display: 'Noto Serif Bengali', 'Hind Siliguri', serif;
+    --font-book: 'Noto Serif Bengali', Georgia, serif;
+    --font-diary-hand: 'Bensen Handwriting', 'Noto Serif Bengali', serif;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #ffffff;
+    color: #1a1a1a;
+  }
+}
+
+.font-display-bn {
+  font-family: var(--font-display);
+}
+
+.font-book-bn {
+  font-family: var(--font-book);
+}
+
+.font-diary-hand {
+  font-family: var(--font-diary-hand);
+  word-spacing: 0.14em;
+  letter-spacing: 0.01em;
+}
+
+/* Dynamic Responsive Recipe Diary Typography (Controlled from Admin Panel) */
+.rf-m-bensen {
+  --recipe-font-family: 'Bensen Handwriting', 'Noto Serif Bengali', serif;
+  --recipe-font-style: normal;
+  --recipe-heading-weight: 400;
+  --recipe-word-spacing: 0.14em;
+  --recipe-letter-spacing: 0.01em;
+}
+.rf-m-atma {
+  --recipe-font-family: 'Atma', 'Noto Serif Bengali', cursive, serif;
+  --recipe-font-style: normal;
+  --recipe-heading-weight: 600;
+  --recipe-word-spacing: 0.1em;
+  --recipe-letter-spacing: 0.01em;
+}
+.rf-m-tiro-italic {
+  --recipe-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+  --recipe-font-style: italic;
+  --recipe-heading-weight: 400;
+  --recipe-word-spacing: 0.08em;
+  --recipe-letter-spacing: 0.005em;
+}
+.rf-m-noto-serif {
+  --recipe-font-family: 'Noto Serif Bengali', Georgia, serif;
+  --recipe-font-style: normal;
+  --recipe-heading-weight: 700;
+  --recipe-word-spacing: 0.03em;
+  --recipe-letter-spacing: normal;
+}
+.rf-m-tiro {
+  --recipe-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+  --recipe-font-style: normal;
+  --recipe-heading-weight: 400;
+  --recipe-word-spacing: 0.04em;
+  --recipe-letter-spacing: normal;
+}
+.rf-m-hind-siliguri {
+  --recipe-font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
+  --recipe-font-style: normal;
+  --recipe-heading-weight: 700;
+  --recipe-word-spacing: 0.02em;
+  --recipe-letter-spacing: normal;
+}
+.rf-m-noto-sans {
+  --recipe-font-family: 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
+  --recipe-font-style: normal;
+  --recipe-heading-weight: 700;
+  --recipe-word-spacing: 0.02em;
+  --recipe-letter-spacing: normal;
+}
+
+@media (min-width: 768px) {
+  .rf-pc-bensen {
+    --recipe-font-family: 'Bensen Handwriting', 'Noto Serif Bengali', serif;
+    --recipe-font-style: normal;
+    --recipe-heading-weight: 400;
+    --recipe-word-spacing: 0.14em;
+    --recipe-letter-spacing: 0.01em;
+  }
+  .rf-pc-atma {
+    --recipe-font-family: 'Atma', 'Noto Serif Bengali', cursive, serif;
+    --recipe-font-style: normal;
+    --recipe-heading-weight: 600;
+    --recipe-word-spacing: 0.1em;
+    --recipe-letter-spacing: 0.01em;
+  }
+  .rf-pc-tiro-italic {
+    --recipe-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+    --recipe-font-style: italic;
+    --recipe-heading-weight: 400;
+    --recipe-word-spacing: 0.08em;
+    --recipe-letter-spacing: 0.005em;
+  }
+  .rf-pc-noto-serif {
+    --recipe-font-family: 'Noto Serif Bengali', Georgia, serif;
+    --recipe-font-style: normal;
+    --recipe-heading-weight: 700;
+    --recipe-word-spacing: 0.03em;
+    --recipe-letter-spacing: normal;
+  }
+  .rf-pc-tiro {
+    --recipe-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+    --recipe-font-style: normal;
+    --recipe-heading-weight: 400;
+    --recipe-word-spacing: 0.04em;
+    --recipe-letter-spacing: normal;
+  }
+  .rf-pc-hind-siliguri {
+    --recipe-font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
+    --recipe-font-style: normal;
+    --recipe-heading-weight: 700;
+    --recipe-word-spacing: 0.02em;
+    --recipe-letter-spacing: normal;
+  }
+  .rf-pc-noto-sans {
+    --recipe-font-family: 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
+    --recipe-font-style: normal;
+    --recipe-heading-weight: 700;
+    --recipe-word-spacing: 0.02em;
+    --recipe-letter-spacing: normal;
+  }
+}
+
+.font-recipe-diary {
+  font-family: var(--recipe-font-family, 'Bensen Handwriting', 'Noto Serif Bengali', serif);
+  font-style: var(--recipe-font-style, normal);
+  word-spacing: var(--recipe-word-spacing, 0.14em);
+  letter-spacing: var(--recipe-letter-spacing, 0.01em);
+}
+
+.font-recipe-diary-heading {
+  font-family: var(--recipe-font-family, 'Bensen Handwriting', 'Noto Serif Bengali', serif);
+  font-style: var(--recipe-font-style, normal);
+  font-weight: var(--recipe-heading-weight, 400);
+  word-spacing: var(--recipe-word-spacing, 0.14em);
+  letter-spacing: var(--recipe-letter-spacing, 0.01em);
+}
+
+.font-numeral-bn {
+  font-family: 'Noto Sans Bengali', system-ui, sans-serif;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle scrollbar hiding for horizontal mobile filter pills */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes rs-route-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+.animate-route-slide {
+  animation: rs-route-slide 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes rs-diary-open {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.975);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes rs-diary-fade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes rs-page-next {
+  0% {
+    opacity: 0;
+    transform: translateX(28px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes rs-page-prev {
+  0% {
+    opacity: 0;
+    transform: translateX(-28px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-diary-open {
+  animation: rs-diary-open 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-diary-fade {
+  animation: rs-diary-fade 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-diary-next {
+  animation: rs-page-next 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-diary-prev {
+  animation: rs-page-prev 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,342 @@
+{
+  "entities": {
+    "Recipe": {
+      "title": "Recipe",
+      "description": "Public catalog metadata for a Bengali cooking recipe",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "subtitle": { "type": "string", "maxLength": 260 },
+        "imageUrl": { "type": "string", "maxLength": 350000 },
+        "cuisine": { "type": "string", "maxLength": 40 },
+        "dietType": { "type": "string", "enum": ["ভেজ", "নন-ভেজ"] },
+        "category": { "type": "string", "maxLength": 40 },
+        "cookTime": { "type": "string", "maxLength": 40 },
+        "prepTime": { "type": "string", "maxLength": 40 },
+        "difficulty": { "type": "string", "enum": ["সহজ", "মাঝারি", "কঠিন"] },
+        "servings": { "type": "string", "maxLength": 30 },
+        "rating": { "type": "number" },
+        "ratingCount": { "type": "integer" },
+        "isPremium": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "orderIndex": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "title",
+        "subtitle",
+        "imageUrl",
+        "cuisine",
+        "dietType",
+        "category",
+        "cookTime",
+        "difficulty",
+        "rating",
+        "ratingCount",
+        "isPremium",
+        "isFeatured",
+        "orderIndex",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "RecipeContent": {
+      "title": "RecipeContent",
+      "description": "Full cooking ingredients, step-by-step instructions with images, and chef tips for a recipe",
+      "type": "object",
+      "properties": {
+        "ingredients": { "type": "array" },
+        "steps": { "type": "array" },
+        "stepImages": { "type": "array" },
+        "chefTip": { "type": "string", "maxLength": 1200 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ingredients", "steps", "chefTip", "updatedAt"]
+    },
+    "RecipeComment": {
+      "title": "RecipeComment",
+      "description": "User comment or reply on a recipe post",
+      "type": "object",
+      "properties": {
+        "authorUid": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$", "maxLength": 128 },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "authorPhotoUrl": { "type": "string", "maxLength": 160000 },
+        "text": { "type": "string", "minLength": 2, "maxLength": 1000 },
+        "parentCommentId": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$", "maxLength": 128 },
+        "replyToUid": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$", "maxLength": 128 },
+        "replyToName": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorUid", "authorName", "text", "createdAt"]
+    },
+    "RecipeCategory": {
+      "title": "RecipeCategory",
+      "description": "Dynamic recipe category with customizable culinary icon",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "iconKey": { "type": "string", "maxLength": 40 },
+        "iconImageUrl": { "type": "string", "maxLength": 160000 },
+        "orderIndex": { "type": "integer" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "orderIndex", "isActive", "createdAt", "updatedAt"]
+    },
+    "SubscriptionPlan": {
+      "title": "SubscriptionPlan",
+      "description": "Configurable 1-month membership tier with recipe access quota",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "tier": { "type": "string", "enum": ["basic", "standard", "pro"] },
+        "priceLabel": { "type": "string", "maxLength": 80 },
+        "priceAmount": { "type": "integer" },
+        "durationLabel": { "type": "string", "maxLength": 80 },
+        "durationDays": { "type": "integer" },
+        "recipeLimit": { "type": "integer" },
+        "subtitle": { "type": "string", "maxLength": 140 },
+        "features": { "type": "array" },
+        "accentColor": { "type": "string", "enum": ["green", "gold", "red"] },
+        "isActive": { "type": "boolean" },
+        "orderIndex": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "name",
+        "tier",
+        "priceLabel",
+        "priceAmount",
+        "durationLabel",
+        "durationDays",
+        "features",
+        "accentColor",
+        "isActive",
+        "orderIndex",
+        "updatedAt"
+      ]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Registered user profile, favorites, unlocked recipe quota, and membership tier",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$", "maxLength": 128 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "phoneNumber": { "type": "string", "maxLength": 40 },
+        "photoURL": { "type": "string", "maxLength": 160000 },
+        "role": { "type": "string", "enum": ["member", "admin"] },
+        "subscriptionPlan": { "type": "string", "enum": ["basic", "standard", "pro"] },
+        "subscriptionStatus": { "type": "string", "enum": ["active", "expired"] },
+        "subscriptionExpiresAt": { "type": "string", "format": "date-time" },
+        "lastOrderId": { "type": "string", "maxLength": 128 },
+        "favoriteRecipeIds": { "type": "array" },
+        "unlockedRecipeIds": { "type": "array" },
+        "viewedHistory": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "email",
+        "role",
+        "subscriptionPlan",
+        "subscriptionStatus",
+        "favoriteRecipeIds",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SubscriptionOrder": {
+      "title": "SubscriptionOrder",
+      "description": "Subscription purchase and manual transaction ID verification record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 160 },
+        "userName": { "type": "string", "maxLength": 100 },
+        "planId": { "type": "string", "maxLength": 64 },
+        "planName": { "type": "string", "maxLength": 80 },
+        "planTier": { "type": "string", "enum": ["basic", "standard", "pro"] },
+        "durationDays": { "type": "integer" },
+        "amount": { "type": "integer" },
+        "paymentMethod": { "type": "string", "enum": ["বিকাশ", "নগদ", "রকেট", "ব্যাংক", "ফ্রি"] },
+        "senderNumber": { "type": "string", "maxLength": 40 },
+        "transactionId": { "type": "string", "maxLength": 80 },
+        "status": { "type": "string", "enum": ["pending", "active", "rejected", "revoked"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId",
+        "userEmail",
+        "userName",
+        "planId",
+        "planName",
+        "planTier",
+        "durationDays",
+        "amount",
+        "paymentMethod",
+        "senderNumber",
+        "transactionId",
+        "status",
+        "createdAt"
+      ]
+    },
+    "CookingTip": {
+      "title": "CookingTip",
+      "description": "Culinary tips and kitchen hacks",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "category": { "type": "string", "maxLength": 50 },
+        "summary": { "type": "string", "maxLength": 300 },
+        "content": { "type": "string", "maxLength": 5000 },
+        "readTime": { "type": "string", "maxLength": 30 },
+        "isPublished": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "category", "summary", "content", "readTime", "isPublished", "createdAt", "updatedAt"]
+    },
+    "BlogPost": {
+      "title": "BlogPost",
+      "description": "Culinary story and food culture blog post",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "excerpt": { "type": "string", "maxLength": 320 },
+        "content": { "type": "string", "maxLength": 8000 },
+        "imageUrl": { "type": "string", "maxLength": 350000 },
+        "authorName": { "type": "string", "maxLength": 80 },
+        "category": { "type": "string", "maxLength": 50 },
+        "readTime": { "type": "string", "maxLength": 30 },
+        "isPublished": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "excerpt", "content", "imageUrl", "authorName", "category", "readTime", "isPublished", "createdAt", "updatedAt"]
+    },
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "Global site configuration and manual payment instructions controlled by admin",
+      "type": "object",
+      "properties": {
+        "siteName": { "type": "string", "maxLength": 60 },
+        "tagline": { "type": "string", "maxLength": 160 },
+        "announcementText": { "type": "string", "maxLength": 200 },
+        "showAnnouncement": { "type": "boolean" },
+        "paymentBkashNumber": { "type": "string", "maxLength": 40 },
+        "paymentNagadNumber": { "type": "string", "maxLength": 40 },
+        "paymentInstructions": { "type": "string", "maxLength": 400 },
+        "recipeFontDesktop": { "type": "string", "enum": ["bensen", "atma", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "noto-sans"] },
+        "recipeFontMobile": { "type": "string", "enum": ["bensen", "atma", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "noto-sans"] },
+        "contactEmail": { "type": "string", "maxLength": 120 },
+        "contactPhone": { "type": "string", "maxLength": 40 },
+        "contactAddress": { "type": "string", "maxLength": 200 },
+        "footerNote": { "type": "string", "maxLength": 240 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteName", "tagline", "showAnnouncement", "contactEmail", "contactPhone", "contactAddress", "updatedAt"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "Contact form submission from visitors",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 160 },
+        "subject": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "message": { "type": "string", "minLength": 5, "maxLength": 2000 },
+        "status": { "type": "string", "enum": ["unread", "read"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "subject", "message", "status", "createdAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Authorized admin UID registry",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 160 },
+        "addedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "addedBy", "createdAt"]
+    },
+    "UserNotification": {
+      "title": "UserNotification",
+      "description": "User notification for comment replies and payment verification updates",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["comment_reply", "payment_approved", "payment_rejected", "payment_pending"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 400 },
+        "recipeId": { "type": "string", "maxLength": 128 },
+        "orderId": { "type": "string", "maxLength": 128 },
+        "senderUid": { "type": "string", "maxLength": 128 },
+        "senderName": { "type": "string", "maxLength": 100 },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "title", "message", "isRead", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/recipes/{recipeId}": {
+      "schema": { "$ref": "#/entities/Recipe" },
+      "description": "Catalog metadata for cooking recipes"
+    },
+    "/recipes/{recipeId}/content/detail": {
+      "schema": { "$ref": "#/entities/RecipeContent" },
+      "description": "Full ingredients and step-by-step photo guide for a recipe"
+    },
+    "/recipes/{recipeId}/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/RecipeComment" },
+      "description": "User comments on a recipe post"
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/RecipeCategory" },
+      "description": "Dynamic recipe categories with preset or uploaded icons"
+    },
+    "/subscriptionPlans/{planId}": {
+      "schema": { "$ref": "#/entities/SubscriptionPlan" },
+      "description": "Membership plans displayed on the pricing section"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile, subscription status, and recipe viewing history"
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/UserNotification" },
+      "description": "Private user notifications for comment replies and payment status updates"
+    },
+    "/subscriptionOrders/{orderId}": {
+      "schema": { "$ref": "#/entities/SubscriptionOrder" },
+      "description": "Subscription order and manual TxID verification records"
+    },
+    "/tips/{tipId}": {
+      "schema": { "$ref": "#/entities/CookingTip" },
+      "description": "Kitchen and cooking tips"
+    },
+    "/blogPosts/{postId}": {
+      "schema": { "$ref": "#/entities/BlogPost" },
+      "description": "Culinary blog articles"
+    },
+    "/siteSettings/{settingId}": {
+      "schema": { "$ref": "#/entities/SiteSettings" },
+      "description": "Global site configuration document"
+    },
+    "/contactMessages/{messageId}": {
+      "schema": { "$ref": "#/entities/ContactMessage" },
+      "description": "Visitor contact inquiries"
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Authorized administrator registry"
+    }
+  }
+}

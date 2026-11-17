@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="bn">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>রান্না শিখুন — খাঁটি বাংলা রেসিপি ও রান্না শেখার প্ল্যাটফর্ম</title>
+    <meta name="description" content="সম্পূর্ণ বাংলায় রান্না শেখার মিনিমাল ওয়েবসাইট — ফ্রি ও প্রিমিয়াম রেসিপি, সদস্যপদ সাবস্ক্রিপশন এবং পূর্ণাঙ্গ এডমিন প্যানেল।" />
+    <meta property="og:title" content="রান্না শিখুন — খাঁটি বাংলা রেসিপি ও রান্না শেখার প্ল্যাটফর্ম" />
+    <meta property="og:description" content="সম্পূর্ণ বাংলায় রান্না শেখার মিনিমাল ওয়েবসাইট — ফ্রি ও প্রিমিয়াম রেসিপি, সদস্যপদ সাবস্ক্রিপশন এবং পূর্ণাঙ্গ এডমিন প্যানেল।" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/png" href="%BASE_URL%assets/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://banglawebfonts.pages.dev" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Atma:wght@400;500;600;700&family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@400;500;600;700&family=Tiro+Bangla:ital@0;1&display=swap" rel="stylesheet" />
+    <link href="https://banglawebfonts.pages.dev/css/bensen-handwriting.min.css" rel="stylesheet" />
+  </head>
+  <body class="bg-white text-[#1A1A1A] antialiased selection:bg-[#1B4D24]/15 selection:text-[#1B4D24]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (function () {
+        var shown = false;
+        function showFallback(isUnbuiltSource) {
+          if (shown) return;
+          var root = document.getElementById('root');
+          if (!root || root.childElementCount > 0) return;
+          shown = true;
+          root.innerHTML =
+            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#FAF9F6;font-family:sans-serif;">' +
+              '<div style="max-width:460px;width:100%;background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:28px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.05);">' +
+                '<h1 style="margin:0 0 10px;font-size:20px;color:#1A1A1A;">' +
+                  (isUnbuiltSource ? 'GitHub Pages বিল্ড সেটিংস প্রয়োজন' : 'সাইটটি লোড হতে সমস্যা হয়েছে') +
+                '</h1>' +
+                '<p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4B5563;">' +
+                  (isUnbuiltSource
+                    ? 'আপনার GitHub রিপোজিটরির <b>Settings → Pages → Build and deployment → Source</b> থেকে <b>GitHub Actions</b> নির্বাচন করুন, তাহলে সাইটটি স্বয়ংক্রিয়ভাবে বিল্ড হয়ে চালু হবে।'
+                    : 'অনুগ্রহ করে পৃষ্ঠাটি রিলোড করুন অথবা ব্রাউজার ক্যাশ পরিষ্কার করে আবার চেষ্টা করুন।') +
+                '</p>' +
+                '<button onclick="window.location.reload()" style="padding:10px 20px;border:0;border-radius:12px;background:#1B4D24;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">পুনরায় চেষ্টা করুন</button>' +
+              '</div>' +
+            '</div>';
+        }
+        window.addEventListener(
+          'error',
+          function (e) {
+            var target = e && e.target;
+            if (target && target.tagName === 'SCRIPT') {
+              var src = target.getAttribute('src') || '';
+              showFallback(src.indexOf('/src/main.tsx') !== -1);
+            }
+          },
+          true
+        );
+        setTimeout(function () {
+          var isRawSource = !!document.querySelector('script[src="/src/main.tsx"]');
+          showFallback(isRawSource);
+        }, 4500);
+      })();
+    </script>
+  </body>
+</html>

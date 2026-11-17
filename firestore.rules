@@ -1,0 +1,525 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core helper primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerified() && request.auth.token.email == 'rannashikhun@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function hasActiveSubscription(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId)) &&
+        get(/databases/$(database)/documents/users/$(userId)).data.subscriptionStatus == 'active' &&
+        get(/databases/$(database)/documents/users/$(userId)).data.subscriptionPlan in ['standard', 'pro'];
+    }
+
+    function userWithinQuota(u, recipeId) {
+      return !('unlockedRecipeIds' in u) ||
+        recipeId in u.unlockedRecipeIds ||
+        (u.subscriptionPlan == 'pro' && u.unlockedRecipeIds.size() < 25) ||
+        (u.subscriptionPlan in ['basic', 'standard'] && u.unlockedRecipeIds.size() < 10);
+    }
+
+    // Entity validation helpers
+    function isValidRecipe(data) {
+      return data.keys().hasAll([
+          'title', 'subtitle', 'imageUrl', 'cuisine', 'dietType', 'category',
+          'cookTime', 'difficulty', 'rating', 'ratingCount', 'isPremium',
+          'isFeatured', 'orderIndex', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'title', 'subtitle', 'imageUrl', 'cuisine', 'dietType', 'category',
+          'cookTime', 'prepTime', 'difficulty', 'servings', 'rating',
+          'ratingCount', 'isPremium', 'isFeatured', 'orderIndex', 'createdAt', 'updatedAt'
+        ]) &&
+        data.title is string && data.title.size() >= 2 && data.title.size() <= 140 &&
+        data.subtitle is string && data.subtitle.size() <= 260 &&
+        data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 350000 &&
+        data.cuisine is string && data.cuisine.size() <= 40 &&
+        data.dietType in ['ভেজ', 'নন-ভেজ'] &&
+        data.category is string && data.category.size() <= 40 &&
+        data.cookTime is string && data.cookTime.size() <= 40 &&
+        (!('prepTime' in data) || (data.prepTime is string && data.prepTime.size() <= 40)) &&
+        data.difficulty in ['সহজ', 'মাঝারি', 'কঠিন'] &&
+        (!('servings' in data) || (data.servings is string && data.servings.size() <= 30)) &&
+        (data.rating is number || data.rating is int) && data.rating >= 0 && data.rating <= 5 &&
+        data.ratingCount is int && data.ratingCount >= 0 &&
+        data.isPremium is bool &&
+        data.isFeatured is bool &&
+        data.orderIndex is int && data.orderIndex >= 0 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidRecipeContent(data) {
+      return data.keys().hasAll(['ingredients', 'steps', 'chefTip', 'updatedAt']) &&
+        data.keys().hasOnly(['ingredients', 'steps', 'stepImages', 'chefTip', 'videoDuration', 'updatedAt']) &&
+        data.ingredients is list && data.ingredients.size() <= 40 &&
+        (data.ingredients.size() == 0 || data.ingredients[0] is string) &&
+        data.steps is list && data.steps.size() <= 40 &&
+        (data.steps.size() == 0 || data.steps[0] is string) &&
+        (!('stepImages' in data) || (
+          data.stepImages is list && data.stepImages.size() <= 40 &&
+          (data.stepImages.size() == 0 || data.stepImages[0] is string)
+        )) &&
+        data.chefTip is string && data.chefTip.size() <= 1200 &&
+        (!('videoDuration' in data) || (data.videoDuration is string && data.videoDuration.size() <= 40)) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidRecipeComment(data) {
+      return data.keys().hasAll(['authorUid', 'authorName', 'text', 'createdAt']) &&
+        data.keys().hasOnly([
+          'authorUid', 'authorName', 'authorPhotoUrl', 'text',
+          'parentCommentId', 'replyToUid', 'replyToName', 'createdAt'
+        ]) &&
+        isValidId(data.authorUid) &&
+        data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 100 &&
+        (!('authorPhotoUrl' in data) || (data.authorPhotoUrl is string && data.authorPhotoUrl.size() <= 160000)) &&
+        data.text is string && data.text.size() >= 2 && data.text.size() <= 1000 &&
+        (!('parentCommentId' in data) || isValidId(data.parentCommentId)) &&
+        (!('replyToUid' in data) || isValidId(data.replyToUid)) &&
+        (!('replyToName' in data) || (data.replyToName is string && data.replyToName.size() <= 100)) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['name', 'orderIndex', 'isActive', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['name', 'iconKey', 'iconImageUrl', 'orderIndex', 'isActive', 'createdAt', 'updatedAt']) &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 40 &&
+        (!('iconKey' in data) || (data.iconKey is string && data.iconKey.size() <= 40)) &&
+        (!('iconImageUrl' in data) || (data.iconImageUrl is string && data.iconImageUrl.size() <= 160000)) &&
+        data.orderIndex is int && data.orderIndex >= 0 &&
+        data.isActive is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPlan(data) {
+      return data.keys().hasAll([
+          'name', 'tier', 'priceLabel', 'priceAmount', 'durationLabel',
+          'durationDays', 'features', 'accentColor', 'isActive', 'orderIndex', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'name', 'tier', 'priceLabel', 'priceAmount', 'durationLabel',
+          'durationDays', 'recipeLimit', 'subtitle', 'features', 'accentColor', 'isActive', 'orderIndex', 'updatedAt'
+        ]) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 60 &&
+        data.tier in ['basic', 'standard', 'pro'] &&
+        data.priceLabel is string && data.priceLabel.size() <= 80 &&
+        data.priceAmount is int && data.priceAmount >= 0 &&
+        data.durationLabel is string && data.durationLabel.size() <= 80 &&
+        data.durationDays is int && data.durationDays >= 1 &&
+        (!('recipeLimit' in data) || (data.recipeLimit is int && data.recipeLimit >= 1 && data.recipeLimit <= 1000)) &&
+        (!('subtitle' in data) || (data.subtitle is string && data.subtitle.size() <= 140)) &&
+        data.features is list && data.features.size() <= 10 &&
+        (data.features.size() == 0 || data.features[0] is string) &&
+        data.accentColor in ['green', 'gold', 'red'] &&
+        data.isActive is bool &&
+        data.orderIndex is int && data.orderIndex >= 0 &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll([
+          'uid', 'displayName', 'email', 'role', 'subscriptionPlan',
+          'subscriptionStatus', 'favoriteRecipeIds', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid', 'displayName', 'email', 'phoneNumber', 'photoURL', 'role', 'subscriptionPlan',
+          'subscriptionStatus', 'subscriptionExpiresAt', 'lastOrderId',
+          'favoriteRecipeIds', 'unlockedRecipeIds', 'viewedHistory', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.uid) &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+        data.email is string && data.email.size() <= 160 &&
+        (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 40)) &&
+        (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 160000)) &&
+        data.role in ['member', 'admin'] &&
+        data.subscriptionPlan in ['basic', 'standard', 'pro'] &&
+        data.subscriptionStatus in ['active', 'expired'] &&
+        (!('subscriptionExpiresAt' in data) || data.subscriptionExpiresAt is timestamp) &&
+        (!('lastOrderId' in data) || isValidId(data.lastOrderId)) &&
+        data.favoriteRecipeIds is list && data.favoriteRecipeIds.size() <= 100 &&
+        (data.favoriteRecipeIds.size() == 0 || data.favoriteRecipeIds[0] is string) &&
+        (!('unlockedRecipeIds' in data) || (
+          data.unlockedRecipeIds is list && data.unlockedRecipeIds.size() <= 100 &&
+          (data.unlockedRecipeIds.size() == 0 || data.unlockedRecipeIds[0] is string)
+        )) &&
+        (!('viewedHistory' in data) || (
+          data.viewedHistory is list && data.viewedHistory.size() <= 50 &&
+          (data.viewedHistory.size() == 0 || (
+            data.viewedHistory[0] is map &&
+            data.viewedHistory[0].keys().hasAll(['recipeId', 'viewedAt']) &&
+            data.viewedHistory[0].keys().hasOnly(['recipeId', 'viewedAt']) &&
+            data.viewedHistory[0].recipeId is string &&
+            data.viewedHistory[0].recipeId.size() >= 1 &&
+            data.viewedHistory[0].recipeId.size() <= 128 &&
+            data.viewedHistory[0].viewedAt is int
+          ))
+        )) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidUserNotification(data) {
+      return data.keys().hasAll(['type', 'title', 'message', 'isRead', 'createdAt']) &&
+        data.keys().hasOnly([
+          'type', 'title', 'message', 'recipeId', 'orderId',
+          'senderUid', 'senderName', 'isRead', 'createdAt'
+        ]) &&
+        data.type in ['comment_reply', 'payment_approved', 'payment_rejected', 'payment_pending'] &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
+        data.message is string && data.message.size() >= 1 && data.message.size() <= 400 &&
+        (!('recipeId' in data) || (data.recipeId is string && data.recipeId.size() >= 1 && data.recipeId.size() <= 128)) &&
+        (!('orderId' in data) || isValidId(data.orderId)) &&
+        (!('senderUid' in data) || isValidId(data.senderUid)) &&
+        (!('senderName' in data) || (data.senderName is string && data.senderName.size() <= 100)) &&
+        data.isRead is bool &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidSubscriptionOrder(data) {
+      return data.keys().hasAll([
+          'userId', 'userEmail', 'userName', 'planId', 'planName',
+          'planTier', 'durationDays', 'amount', 'paymentMethod', 'senderNumber',
+          'transactionId', 'status', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'userEmail', 'userName', 'planId', 'planName',
+          'planTier', 'durationDays', 'amount', 'paymentMethod', 'senderNumber',
+          'transactionId', 'status', 'createdAt'
+        ]) &&
+        isValidId(data.userId) &&
+        data.userEmail is string && data.userEmail.size() <= 160 &&
+        data.userName is string && data.userName.size() <= 100 &&
+        data.planId is string && data.planId.size() <= 64 &&
+        data.planName is string && data.planName.size() <= 80 &&
+        data.planTier in ['basic', 'standard', 'pro'] &&
+        data.durationDays is int && data.durationDays >= 1 &&
+        data.amount is int && data.amount >= 0 &&
+        data.paymentMethod in ['বিকাশ', 'নগদ', 'রকেট', 'ব্যাংক', 'ফ্রি'] &&
+        data.senderNumber is string && data.senderNumber.size() <= 40 &&
+        data.transactionId is string && data.transactionId.size() <= 80 &&
+        (data.senderNumber.size() >= 6 || data.transactionId.size() >= 3) &&
+        data.status in ['pending', 'active', 'rejected', 'revoked'] &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidTip(data) {
+      return data.keys().hasAll(['title', 'category', 'summary', 'content', 'readTime', 'isPublished', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['title', 'category', 'summary', 'content', 'readTime', 'isPublished', 'createdAt', 'updatedAt']) &&
+        data.title is string && data.title.size() >= 2 && data.title.size() <= 140 &&
+        data.category is string && data.category.size() <= 50 &&
+        data.summary is string && data.summary.size() <= 300 &&
+        data.content is string && data.content.size() <= 5000 &&
+        data.readTime is string && data.readTime.size() <= 30 &&
+        data.isPublished is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidBlogPost(data) {
+      return data.keys().hasAll(['title', 'excerpt', 'content', 'imageUrl', 'authorName', 'category', 'readTime', 'isPublished', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['title', 'excerpt', 'content', 'imageUrl', 'authorName', 'category', 'readTime', 'isPublished', 'createdAt', 'updatedAt']) &&
+        data.title is string && data.title.size() >= 2 && data.title.size() <= 160 &&
+        data.excerpt is string && data.excerpt.size() <= 320 &&
+        data.content is string && data.content.size() <= 8000 &&
+        data.imageUrl is string && data.imageUrl.size() <= 350000 &&
+        data.authorName is string && data.authorName.size() <= 80 &&
+        data.category is string && data.category.size() <= 50 &&
+        data.readTime is string && data.readTime.size() <= 30 &&
+        data.isPublished is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSiteSettings(data) {
+      return data.keys().hasAll(['siteName', 'tagline', 'showAnnouncement', 'contactEmail', 'contactPhone', 'contactAddress', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'siteName', 'tagline', 'announcementText', 'showAnnouncement',
+          'paymentBkashNumber', 'paymentNagadNumber', 'paymentInstructions',
+          'recipeFontDesktop', 'recipeFontMobile',
+          'contactEmail', 'contactPhone', 'contactAddress', 'footerNote', 'updatedAt'
+        ]) &&
+        data.siteName is string && data.siteName.size() >= 2 && data.siteName.size() <= 60 &&
+        data.tagline is string && data.tagline.size() <= 160 &&
+        (!('announcementText' in data) || (data.announcementText is string && data.announcementText.size() <= 200)) &&
+        data.showAnnouncement is bool &&
+        (!('paymentBkashNumber' in data) || (data.paymentBkashNumber is string && data.paymentBkashNumber.size() <= 40)) &&
+        (!('paymentNagadNumber' in data) || (data.paymentNagadNumber is string && data.paymentNagadNumber.size() <= 40)) &&
+        (!('paymentInstructions' in data) || (data.paymentInstructions is string && data.paymentInstructions.size() <= 400)) &&
+        (!('recipeFontDesktop' in data) || (data.recipeFontDesktop is string && data.recipeFontDesktop in ['bensen', 'atma', 'tiro-italic', 'noto-serif', 'tiro', 'hind-siliguri', 'noto-sans'])) &&
+        (!('recipeFontMobile' in data) || (data.recipeFontMobile is string && data.recipeFontMobile in ['bensen', 'atma', 'tiro-italic', 'noto-serif', 'tiro', 'hind-siliguri', 'noto-sans'])) &&
+        data.contactEmail is string && data.contactEmail.size() <= 120 &&
+        data.contactPhone is string && data.contactPhone.size() <= 40 &&
+        data.contactAddress is string && data.contactAddress.size() <= 200 &&
+        (!('footerNote' in data) || (data.footerNote is string && data.footerNote.size() <= 240)) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidContactMessage(data) {
+      return data.keys().hasAll(['name', 'email', 'subject', 'message', 'status', 'createdAt']) &&
+        data.keys().hasOnly(['name', 'email', 'subject', 'message', 'status', 'createdAt']) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 100 &&
+        data.email is string && data.email.size() >= 4 && data.email.size() <= 160 &&
+        data.subject is string && data.subject.size() >= 2 && data.subject.size() <= 160 &&
+        data.message is string && data.message.size() >= 5 && data.message.size() <= 2000 &&
+        data.status in ['unread', 'read'] &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['email', 'addedBy', 'createdAt']) &&
+        data.keys().hasOnly(['email', 'addedBy', 'createdAt']) &&
+        data.email is string && data.email.size() <= 160 &&
+        isValidId(data.addedBy) &&
+        data.createdAt is timestamp;
+    }
+
+    // 1. Recipes catalog & gated content subcollection
+    match /recipes/{recipeId} {
+      allow list: if true;
+      allow get: if isValidId(recipeId);
+      allow create: if isValidId(recipeId) && isAdmin() && isValidRecipe(incoming()) &&
+        incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(recipeId) && isAdmin() && isValidRecipe(incoming()) &&
+        incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow delete: if isValidId(recipeId) && isAdmin();
+
+      match /content/detail {
+        allow get: if isValidId(recipeId) && (
+          isAdmin() ||
+          (
+            get(/databases/$(database)/documents/recipes/$(recipeId)).data.isPremium == false && (
+              !isSignedIn() ||
+              !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+              userWithinQuota(get(/databases/$(database)/documents/users/$(request.auth.uid)).data, recipeId)
+            )
+          ) ||
+          (
+            isSignedIn() &&
+            hasActiveSubscription(request.auth.uid) &&
+            userWithinQuota(get(/databases/$(database)/documents/users/$(request.auth.uid)).data, recipeId)
+          )
+        );
+        allow create, update: if isValidId(recipeId) && isAdmin() && isValidRecipeContent(incoming()) &&
+          incoming().updatedAt == request.time;
+        allow delete: if isValidId(recipeId) && isAdmin();
+      }
+
+      match /comments/{commentId} {
+        allow list: if true;
+        allow get: if isValidId(commentId);
+        allow create: if isValidId(recipeId) && isValidId(commentId) && isSignedIn() &&
+          isValidRecipeComment(incoming()) &&
+          incoming().authorUid == request.auth.uid &&
+          incoming().createdAt == request.time;
+        allow update: if false;
+        allow delete: if isValidId(commentId) && (
+          isAdmin() || (isSignedIn() && existing().authorUid == request.auth.uid)
+        );
+      }
+    }
+
+    // 1b. Dynamic Recipe Categories
+    match /categories/{categoryId} {
+      allow list: if true;
+      allow get: if isValidId(categoryId);
+      allow create: if isValidId(categoryId) && isAdmin() && isValidCategory(incoming()) &&
+        incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(categoryId) && isAdmin() && isValidCategory(incoming()) &&
+        incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow delete: if isValidId(categoryId) && isAdmin();
+    }
+
+    // 2. Subscription Plans
+    match /subscriptionPlans/{planId} {
+      allow list: if true;
+      allow get: if isValidId(planId);
+      allow create, update: if isValidId(planId) && isAdmin() && isValidPlan(incoming()) &&
+        incoming().updatedAt == request.time;
+      allow delete: if isValidId(planId) && isAdmin();
+    }
+
+    // 3. Users (PII strict owner/admin isolation)
+    match /users/{userId} {
+      allow list: if isAdmin();
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow create: if isValidId(userId) && isSignedIn() && isOwner(userId) &&
+        isValidUser(incoming()) &&
+        incoming().uid == request.auth.uid &&
+        incoming().subscriptionStatus == 'active' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          (incoming().role == 'member' && incoming().subscriptionPlan == 'basic') ||
+          isBootstrappedAdmin()
+        );
+      allow update: if isValidId(userId) && isSignedIn() && isValidUser(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            isOwner(userId) &&
+            incoming().role == existing().role &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'phoneNumber', 'favoriteRecipeIds', 'unlockedRecipeIds', 'viewedHistory', 'updatedAt']) &&
+            incoming().subscriptionPlan == existing().subscriptionPlan &&
+            incoming().subscriptionStatus == existing().subscriptionStatus &&
+            (!('unlockedRecipeIds' in incoming()) || (
+              (!('unlockedRecipeIds' in existing()) || incoming().unlockedRecipeIds.hasAll(existing().unlockedRecipeIds)) &&
+              (
+                (existing().subscriptionPlan == 'pro' && incoming().unlockedRecipeIds.size() <= 25) ||
+                (existing().subscriptionPlan in ['basic', 'standard'] && incoming().unlockedRecipeIds.size() <= 10)
+              )
+            ))
+          ) ||
+          (
+            // Free Basic plan instant self-activation via order batch
+            isOwner(userId) &&
+            incoming().role == existing().role &&
+            incoming().subscriptionPlan == 'basic' &&
+            incoming().subscriptionStatus == 'active' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['subscriptionPlan', 'subscriptionStatus', 'subscriptionExpiresAt', 'lastOrderId', 'updatedAt']) &&
+            'lastOrderId' in incoming() &&
+            existsAfter(/databases/$(database)/documents/subscriptionOrders/$(incoming().lastOrderId)) &&
+            getAfter(/databases/$(database)/documents/subscriptionOrders/$(incoming().lastOrderId)).data.userId == request.auth.uid &&
+            getAfter(/databases/$(database)/documents/subscriptionOrders/$(incoming().lastOrderId)).data.planTier == 'basic' &&
+            getAfter(/databases/$(database)/documents/subscriptionOrders/$(incoming().lastOrderId)).data.status == 'active'
+          )
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+
+      match /notifications/{notificationId} {
+        allow list: if isOwner(userId) || isAdmin();
+        allow get: if isValidId(notificationId) && (isOwner(userId) || isAdmin());
+        allow create: if isValidId(notificationId) && isSignedIn() &&
+          isValidUserNotification(incoming()) &&
+          incoming().createdAt == request.time &&
+          incoming().isRead == false && (
+            isAdmin() ||
+            (incoming().type == 'payment_pending' && isOwner(userId)) ||
+            (
+              incoming().type == 'comment_reply' &&
+              'senderUid' in incoming() &&
+              incoming().senderUid == request.auth.uid &&
+              'recipeId' in incoming() &&
+              isValidId(incoming().recipeId) &&
+              exists(/databases/$(database)/documents/recipes/$(incoming().recipeId))
+            )
+          );
+        allow update: if isValidId(notificationId) && isSignedIn() && isOwner(userId) &&
+          isValidUserNotification(incoming()) &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+        allow delete: if isValidId(notificationId) && (isOwner(userId) || isAdmin());
+      }
+    }
+
+    // 4. Subscription Orders (Manual TxID verification for paid plans)
+    match /subscriptionOrders/{orderId} {
+      allow list: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
+      allow get: if isValidId(orderId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow create: if isValidId(orderId) && isSignedIn() &&
+        isValidSubscriptionOrder(incoming()) &&
+        incoming().userId == request.auth.uid &&
+        incoming().createdAt == request.time && (
+          (incoming().planTier == 'basic' && incoming().amount == 0 && incoming().status == 'active') ||
+          (incoming().planTier in ['standard', 'pro'] && incoming().amount > 0 && incoming().status == 'pending')
+        );
+      allow update: if isValidId(orderId) && isAdmin() &&
+        isValidSubscriptionOrder(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+      allow delete: if isValidId(orderId) && isAdmin();
+    }
+
+    // 5. Cooking Tips
+    match /tips/{tipId} {
+      allow list: if true;
+      allow get: if isValidId(tipId);
+      allow create: if isValidId(tipId) && isAdmin() && isValidTip(incoming()) &&
+        incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(tipId) && isAdmin() && isValidTip(incoming()) &&
+        incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow delete: if isValidId(tipId) && isAdmin();
+    }
+
+    // 6. Blog Posts
+    match /blogPosts/{postId} {
+      allow list: if true;
+      allow get: if isValidId(postId);
+      allow create: if isValidId(postId) && isAdmin() && isValidBlogPost(incoming()) &&
+        incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(postId) && isAdmin() && isValidBlogPost(incoming()) &&
+        incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow delete: if isValidId(postId) && isAdmin();
+    }
+
+    // 7. Site Settings
+    match /siteSettings/{settingId} {
+      allow list: if false;
+      allow get: if isValidId(settingId);
+      allow create, update: if isValidId(settingId) && isAdmin() &&
+        isValidSiteSettings(incoming()) && incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    // 8. Contact Messages
+    match /contactMessages/{messageId} {
+      allow list: if isAdmin();
+      allow get: if isValidId(messageId) && isAdmin();
+      allow create: if isValidId(messageId) && isValidContactMessage(incoming()) &&
+        incoming().status == 'unread' && incoming().createdAt == request.time;
+      allow update: if isValidId(messageId) && isAdmin() &&
+        isValidContactMessage(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+      allow delete: if isValidId(messageId) && isAdmin();
+    }
+
+    // 9. Admins Registry
+    match /admins/{userId} {
+      allow list: if isAdmin();
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow create: if isValidId(userId) && isAdmin() && isValidAdminRecord(incoming()) &&
+        incoming().addedBy == request.auth.uid && incoming().createdAt == request.time;
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+  }
+}
