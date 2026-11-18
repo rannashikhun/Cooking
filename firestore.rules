@@ -274,6 +274,8 @@ service cloud.firestore {
           'siteName', 'tagline', 'announcementText', 'showAnnouncement',
           'paymentBkashNumber', 'paymentNagadNumber', 'paymentInstructions',
           'recipeFontDesktop', 'recipeFontMobile',
+          'recipeFontSizeDesktop', 'recipeFontSizeMobile',
+          'adminFontFamily', 'adminFontSize',
           'contactEmail', 'contactPhone', 'contactAddress', 'footerNote', 'updatedAt'
         ]) &&
         data.siteName is string && data.siteName.size() >= 2 && data.siteName.size() <= 60 &&
@@ -285,6 +287,10 @@ service cloud.firestore {
         (!('paymentInstructions' in data) || (data.paymentInstructions is string && data.paymentInstructions.size() <= 400)) &&
         (!('recipeFontDesktop' in data) || (data.recipeFontDesktop is string && data.recipeFontDesktop in ['bensen', 'atma', 'tiro-italic', 'noto-serif', 'tiro', 'hind-siliguri', 'noto-sans'])) &&
         (!('recipeFontMobile' in data) || (data.recipeFontMobile is string && data.recipeFontMobile in ['bensen', 'atma', 'tiro-italic', 'noto-serif', 'tiro', 'hind-siliguri', 'noto-sans'])) &&
+        (!('recipeFontSizeDesktop' in data) || (data.recipeFontSizeDesktop is string && data.recipeFontSizeDesktop in ['sm', 'md', 'lg', 'xl'])) &&
+        (!('recipeFontSizeMobile' in data) || (data.recipeFontSizeMobile is string && data.recipeFontSizeMobile in ['sm', 'md', 'lg', 'xl'])) &&
+        (!('adminFontFamily' in data) || (data.adminFontFamily is string && data.adminFontFamily in ['bensen', 'atma', 'tiro-italic', 'noto-serif', 'tiro', 'hind-siliguri', 'noto-sans'])) &&
+        (!('adminFontSize' in data) || (data.adminFontSize is string && data.adminFontSize in ['sm', 'md', 'lg', 'xl'])) &&
         data.contactEmail is string && data.contactEmail.size() <= 120 &&
         data.contactPhone is string && data.contactPhone.size() <= 40 &&
         data.contactAddress is string && data.contactAddress.size() <= 200 &&

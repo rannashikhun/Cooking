@@ -7,7 +7,7 @@ import {
   query,
   Timestamp,
 } from 'firebase/firestore';
-import { RECIPE_FONT_OPTIONS, SEED_RECIPES } from '../data/seedData';
+import { FONT_SIZE_OPTIONS, RECIPE_FONT_OPTIONS, SEED_RECIPES } from '../data/seedData';
 import {
   ArrowLeft,
   CheckSquare,
@@ -41,6 +41,7 @@ import {
   saveLocalRecipeRead,
 } from '../services/firestoreService';
 import type {
+  FontSizeKey,
   PageRoute,
   Recipe,
   RecipeComment,
@@ -70,11 +71,22 @@ const VALID_RECIPE_FONT_KEYS = new Set<RecipeFontKey>(
   RECIPE_FONT_OPTIONS.map((opt) => opt.key)
 );
 
+const VALID_FONT_SIZE_KEYS = new Set<FontSizeKey>(
+  FONT_SIZE_OPTIONS.map((opt) => opt.key)
+);
+
 function resolveRecipeFontKey(key?: string): RecipeFontKey {
   if (key && VALID_RECIPE_FONT_KEYS.has(key as RecipeFontKey)) {
     return key as RecipeFontKey;
   }
   return 'bensen';
+}
+
+function resolveFontSizeKey(key?: string): FontSizeKey {
+  if (key && VALID_FONT_SIZE_KEYS.has(key as FontSizeKey)) {
+    return key as FontSizeKey;
+  }
+  return 'md';
 }
 
 const toBengaliDigits = (val: string | number): string => {
@@ -116,7 +128,9 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
 }) => {
   const desktopFontKey = resolveRecipeFontKey(siteSettings?.recipeFontDesktop);
   const mobileFontKey = resolveRecipeFontKey(siteSettings?.recipeFontMobile);
-  const recipeFontScopeClass = `rf-m-${mobileFontKey} rf-pc-${desktopFontKey}`;
+  const desktopFontSizeKey = resolveFontSizeKey(siteSettings?.recipeFontSizeDesktop);
+  const mobileFontSizeKey = resolveFontSizeKey(siteSettings?.recipeFontSizeMobile);
+  const recipeFontScopeClass = `rf-m-${mobileFontKey} rf-pc-${desktopFontKey} rf-size-scope rf-size-m-${mobileFontSizeKey} rf-size-pc-${desktopFontSizeKey}`;
   const [content, setContent] = useState<RecipeContent | null>(null);
   const [locked, setLocked] = useState(false);
   const [lockReason, setLockReason] = useState<'premium' | 'quota_basic' | 'quota_paid' | null>(null);

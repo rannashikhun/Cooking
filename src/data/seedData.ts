@@ -528,6 +528,40 @@ export const RECIPE_FONT_OPTIONS: RecipeFontOption[] = [
   },
 ];
 
+export interface FontSizeOption {
+  key: NonNullable<SiteSettings['adminFontSize']>;
+  label: string;
+  scaleLabel: string;
+  description: string;
+}
+
+export const FONT_SIZE_OPTIONS: FontSizeOption[] = [
+  {
+    key: 'sm',
+    label: 'ছোট',
+    scaleLabel: '৯০%',
+    description: 'কমপ্যাক্ট ও এক স্ক্রিনে বেশি তথ্য',
+  },
+  {
+    key: 'md',
+    label: 'স্বাভাবিক',
+    scaleLabel: '১০০%',
+    description: 'সব ডিভাইসের জন্য ভারসাম্যপূর্ণ স্ট্যান্ডার্ড সাইজ',
+  },
+  {
+    key: 'lg',
+    label: 'বড়',
+    scaleLabel: '১১২%',
+    description: 'সহজ ও আরামদায়ক পাঠের জন্য বড় লেখা',
+  },
+  {
+    key: 'xl',
+    label: 'অতিরিক্ত বড়',
+    scaleLabel: '১২৪%',
+    description: 'সর্বোচ্চ স্পষ্টতা ও বড় ফন্ট প্রদর্শন',
+  },
+];
+
 export const SEED_SETTINGS: Omit<SiteSettings, 'updatedAt'> = {
   siteName: 'রান্না শিখুন',
   tagline: 'সহজ ও খাঁটি বাংলা রান্নার বিশ্বস্ত ঠিকানা',
@@ -538,6 +572,10 @@ export const SEED_SETTINGS: Omit<SiteSettings, 'updatedAt'> = {
   paymentInstructions: 'উপরের বিকাশ বা নগদ নম্বরে Send Money করে নিচের ফর্মে আপনার নম্বর ও ট্রানজেকশন আইডি (TxID) জমা দিন। এডমিন যাচাই করে আপনার প্ল্যান সক্রিয় করে দেবেন।',
   recipeFontDesktop: 'bensen',
   recipeFontMobile: 'bensen',
+  recipeFontSizeDesktop: 'md',
+  recipeFontSizeMobile: 'md',
+  adminFontFamily: 'hind-siliguri',
+  adminFontSize: 'md',
   contactEmail: 'rannashikhun@gmail.com',
   contactPhone: '+৮৮০ ১৭১১-০০০০০০',
   contactAddress: 'বাড়ি ২৪, রোড ৭, ধানমন্ডি, ঢাকা-১২০৫',

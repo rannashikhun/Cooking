@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { sendEmailVerification } from 'firebase/auth';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
-import { RECIPE_FONT_OPTIONS, SEED_RECIPES } from '../data/seedData';
+import { FONT_SIZE_OPTIONS, RECIPE_FONT_OPTIONS, SEED_RECIPES } from '../data/seedData';
 import {
   approveSubscriptionOrderAdmin,
   deleteBlogAdmin,
@@ -59,6 +59,7 @@ import type {
   ContactMessage,
   CookingTip,
   DifficultyLevel,
+  FontSizeKey,
   PageRoute,
   PlanAccent,
   PlanTier,
@@ -188,6 +189,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [sFontMobile, setSFontMobile] = useState<RecipeFontKey>(
     siteSettings.recipeFontMobile || 'bensen'
   );
+  const [sFontSizeDesktop, setSFontSizeDesktop] = useState<FontSizeKey>(
+    siteSettings.recipeFontSizeDesktop || 'md'
+  );
+  const [sFontSizeMobile, setSFontSizeMobile] = useState<FontSizeKey>(
+    siteSettings.recipeFontSizeMobile || 'md'
+  );
+  const [sFontAdmin, setSFontAdmin] = useState<RecipeFontKey>(
+    siteSettings.adminFontFamily || 'hind-siliguri'
+  );
+  const [sFontSizeAdmin, setSFontSizeAdmin] = useState<FontSizeKey>(
+    siteSettings.adminFontSize || 'md'
+  );
   const [savingFonts, setSavingFonts] = useState(false);
 
   const notify = (msg: string) => {
@@ -209,6 +222,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setSFooter(siteSettings.footerNote || '');
     setSFontDesktop(siteSettings.recipeFontDesktop || 'bensen');
     setSFontMobile(siteSettings.recipeFontMobile || 'bensen');
+    setSFontSizeDesktop(siteSettings.recipeFontSizeDesktop || 'md');
+    setSFontSizeMobile(siteSettings.recipeFontSizeMobile || 'md');
+    setSFontAdmin(siteSettings.adminFontFamily || 'hind-siliguri');
+    setSFontSizeAdmin(siteSettings.adminFontSize || 'md');
   }, [siteSettings]);
 
   useEffect(() => {
@@ -676,6 +693,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       paymentInstructions: sPayInst.trim(),
       recipeFontDesktop: sFontDesktop,
       recipeFontMobile: sFontMobile,
+      recipeFontSizeDesktop: sFontSizeDesktop,
+      recipeFontSizeMobile: sFontSizeMobile,
+      adminFontFamily: sFontAdmin,
+      adminFontSize: sFontSizeAdmin,
       contactEmail: sEmail.trim(),
       contactPhone: sPhone.trim(),
       contactAddress: sAddress.trim(),
@@ -698,19 +719,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         paymentInstructions: siteSettings.paymentInstructions || '',
         recipeFontDesktop: sFontDesktop,
         recipeFontMobile: sFontMobile,
+        recipeFontSizeDesktop: sFontSizeDesktop,
+        recipeFontSizeMobile: sFontSizeMobile,
+        adminFontFamily: sFontAdmin,
+        adminFontSize: sFontSizeAdmin,
         contactEmail: siteSettings.contactEmail,
         contactPhone: siteSettings.contactPhone,
         contactAddress: siteSettings.contactAddress,
         footerNote: siteSettings.footerNote || '',
       });
-      notify('PC ও মোবাইল ভার্সনের রেসিপি ফন্ট সফলভাবে সংরক্ষণ করা হয়েছে!');
+      notify('এডমিন প্যানেল ও রেসিপি পোস্টের ফন্ট এবং সাইজ সফলভাবে সংরক্ষণ করা হয়েছে!');
     } finally {
       setSavingFonts(false);
     }
   };
 
   return (
-    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-8 pb-24">
+    <section
+      className={`admin-typography-scope admin-font-${sFontAdmin} admin-size-${sFontSizeAdmin} max-w-6xl mx-auto px-4 sm:px-6 py-8 pb-24`}
+    >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gray-200">
         <div>
           <div className="inline-flex items-center gap-2 text-xs font-bold text-[#1B4D24]">
@@ -2225,16 +2252,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 6: RECIPE FONT SETTINGS (PC & MOBILE SEPARATELY) */}
+      {/* TAB 6: ADMIN & RECIPE FONT + SIZE SETTINGS */}
       {activeTab === 'fonts' && (
         <form onSubmit={handleSaveFontSettings} className="mt-6 space-y-6">
           <div className="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-[#1A1A1A]">
-                রেসিপি পোস্টের ফন্ট সেটিংস (PC ও মোবাইল আলাদা)
+                ফন্ট ও ফন্ট সাইজ সেটিংস (এডমিন প্যানেল ও রেসিপি পোস্ট)
               </h2>
               <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                রেসিপি পোস্টের শিরোনাম, নিচের বর্ণনা, উপকরণ এবং ধাপে ধাপে নির্দেশনার জন্য PC ও মোবাইল ভার্সনে আলাদা বাংলা ফন্ট বেছে নিন।
+                এডমিন প্যানেলের নিজস্ব ফন্ট ও ফন্ট সাইজ এবং রেসিপি পোস্টের PC ও মোবাইল ভার্সনের আলাদা ফন্ট ও সাইজ এখান থেকে পরিবর্তন করুন।
               </p>
             </div>
             <button
@@ -2246,24 +2273,222 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </button>
           </div>
 
+          {/* SECTION 1: ADMIN PANEL FONT & FONT SIZE */}
+          {(() => {
+            const adminBookFonts = RECIPE_FONT_OPTIONS.filter((f) => f.category === 'book');
+            const adminHandFonts = RECIPE_FONT_OPTIONS.filter(
+              (f) => f.category === 'handwriting'
+            );
+            const selectedAdminFont =
+              RECIPE_FONT_OPTIONS.find((f) => f.key === sFontAdmin) || RECIPE_FONT_OPTIONS[0];
+            const selectedAdminSize =
+              FONT_SIZE_OPTIONS.find((s) => s.key === sFontSizeAdmin) || FONT_SIZE_OPTIONS[1];
+
+            return (
+              <div className="bg-white rounded-2xl border border-[#1B4D24]/30 p-5 sm:p-6 space-y-5 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#1B4D24]/10 text-[#1B4D24] flex items-center justify-center shrink-0">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-[#1A1A1A]">
+                        এডমিন প্যানেলের ফন্ট ও ফন্ট সাইজ
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        পুরো এডমিন ড্যাশবোর্ড, ট্যাব, ফর্ম ও তালিকার লেখার ধরন ও সাইজ তাৎক্ষণিকভাবে বদলে যাবে
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSFontAdmin('hind-siliguri');
+                      setSFontSizeAdmin('md');
+                    }}
+                    className="self-start sm:self-auto px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-xs font-semibold text-gray-700 cursor-pointer"
+                  >
+                    ডিফল্ট রিসেট
+                  </button>
+                </div>
+
+                {/* Live Admin Panel Preview */}
+                <div className="rounded-2xl bg-[#F8FAF8] border border-[#DCE6DC] p-4 sm:p-5 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-[#1B4D24]">
+                    <span>
+                      লাইভ প্রিভিউ: {selectedAdminFont.label} · সাইজ: {selectedAdminSize.label} ({selectedAdminSize.scaleLabel})
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-[#1B4D24]/10 text-[#1B4D24]">
+                      এডমিন প্যানেলে সরাসরি প্রযোজ্য
+                    </span>
+                  </div>
+                  <p className="text-lg sm:text-xl font-bold text-[#1A1A1A] leading-snug">
+                    এডমিন কন্ট্রোল সেন্টার — রেসিপি ও সদস্য ব্যবস্থাপনা
+                  </p>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    নতুন রেসিপি যোগ করুন, পেমেন্ট অনুমোদন দিন এবং সাইটের সব লেখা আপনার পছন্দের ফন্ট ও সাইজে পড়ুন।
+                  </p>
+                </div>
+
+                {/* Admin Font Size Picker */}
+                <div className="space-y-2.5">
+                  <p className="text-xs font-bold text-[#1A1A1A]">
+                    এডমিন প্যানেলের ফন্ট সাইজ বাছাই করুন
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {FONT_SIZE_OPTIONS.map((sizeOpt) => {
+                      const active = sFontSizeAdmin === sizeOpt.key;
+                      return (
+                        <button
+                          key={sizeOpt.key}
+                          type="button"
+                          onClick={() => setSFontSizeAdmin(sizeOpt.key)}
+                          className={`text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                            active
+                              ? 'border-[#1B4D24] bg-[#EEF5EF]/80 ring-2 ring-[#1B4D24]/15'
+                              : 'border-gray-200 hover:border-[#1B4D24]/40 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-sm font-bold text-[#1A1A1A]">
+                              {sizeOpt.label}
+                            </span>
+                            <span
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                active
+                                  ? 'bg-[#1B4D24] text-white'
+                                  : 'bg-gray-100 text-gray-600'
+                              }`}
+                            >
+                              {sizeOpt.scaleLabel}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-500 mt-1 leading-snug">
+                            {sizeOpt.description}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Admin Font Family Picker */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="space-y-2.5">
+                    <p className="text-xs font-bold text-[#1B4D24] tracking-wide">
+                      পরিষ্কার প্রিন্ট ও বইয়ের ফন্ট
+                    </p>
+                    <div className="space-y-2">
+                      {adminBookFonts.map((opt) => {
+                        const isSelected = sFontAdmin === opt.key;
+                        return (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => setSFontAdmin(opt.key)}
+                            className={`w-full text-left p-3.5 rounded-xl border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-[#1B4D24] bg-[#EEF5EF]/70 ring-2 ring-[#1B4D24]/15'
+                                : 'border-gray-200 hover:border-[#1B4D24]/40 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-bold text-[#1A1A1A]">
+                                {opt.label}
+                              </span>
+                              <span
+                                className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                  isSelected
+                                    ? 'bg-[#1B4D24] text-white'
+                                    : 'bg-gray-100 text-gray-500'
+                                }`}
+                              >
+                                {isSelected ? 'নির্বাচিত' : 'বাছাই করুন'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
+                            <p
+                              className={`rf-m-${opt.key} font-recipe-diary text-base text-[#241E17] mt-2 pt-2 border-t border-dashed border-gray-200`}
+                            >
+                              নমুনা: আজকের পেমেন্ট ও রেসিপি তালিকা যাচাই করুন।
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <p className="text-xs font-bold text-[#B92B27] tracking-wide">
+                      হাতের লেখার মতো স্টাইলিশ ফন্ট
+                    </p>
+                    <div className="space-y-2">
+                      {adminHandFonts.map((opt) => {
+                        const isSelected = sFontAdmin === opt.key;
+                        return (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => setSFontAdmin(opt.key)}
+                            className={`w-full text-left p-3.5 rounded-xl border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-[#1B4D24] bg-[#EEF5EF]/70 ring-2 ring-[#1B4D24]/15'
+                                : 'border-gray-200 hover:border-[#1B4D24]/40 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-bold text-[#1A1A1A]">
+                                {opt.label}
+                              </span>
+                              <span
+                                className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                  isSelected
+                                    ? 'bg-[#1B4D24] text-white'
+                                    : 'bg-gray-100 text-gray-500'
+                                }`}
+                              >
+                                {isSelected ? 'নির্বাচিত' : 'বাছাই করুন'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
+                            <p
+                              className={`rf-m-${opt.key} font-recipe-diary text-base text-[#241E17] mt-2 pt-2 border-t border-dashed border-gray-200`}
+                            >
+                              নমুনা: আজকের পেমেন্ট ও রেসিপি তালিকা যাচাই করুন।
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* SECTION 2: RECIPE POST FONT & FONT SIZE (PC & MOBILE SEPARATE) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {(
               [
                 {
                   device: 'pc' as const,
-                  title: 'PC / ল্যাপটপ ভার্সন ফন্ট',
+                  title: 'PC / ল্যাপটপ ভার্সন (রেসিপি পোস্ট)',
                   subtitle: 'বড় স্ক্রিন (ডেস্কটপ ও ট্যাবলেট) রেসিপি পাতায় ব্যবহৃত হবে',
                   icon: Monitor,
                   value: sFontDesktop,
                   onChange: setSFontDesktop,
+                  sizeValue: sFontSizeDesktop,
+                  onSizeChange: setSFontSizeDesktop,
                 },
                 {
                   device: 'mobile' as const,
-                  title: 'মোবাইল ভার্সন ফন্ট',
+                  title: 'মোবাইল ভার্সন (রেসিপি পোস্ট)',
                   subtitle: 'স্মার্টফোন স্ক্রিনের রেসিপি পাতায় ব্যবহৃত হবে',
                   icon: Smartphone,
                   value: sFontMobile,
                   onChange: setSFontMobile,
+                  sizeValue: sFontSizeMobile,
+                  onSizeChange: setSFontSizeMobile,
                 },
               ]
             ).map((panel) => {
@@ -2275,6 +2500,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               const selectedMeta =
                 RECIPE_FONT_OPTIONS.find((f) => f.key === panel.value) ||
                 RECIPE_FONT_OPTIONS[0];
+              const selectedSizeMeta =
+                FONT_SIZE_OPTIONS.find((s) => s.key === panel.sizeValue) ||
+                FONT_SIZE_OPTIONS[1];
 
               return (
                 <div
@@ -2295,12 +2523,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Live Diary Preview Card for Selected Font */}
+                  {/* Live Diary Preview Card for Selected Font & Size */}
                   <div
-                    className={`rf-m-${panel.value} rounded-2xl bg-[#FCF9F2] border border-[#E4DCC8] p-4 sm:p-5 space-y-1.5`}
+                    className={`rf-m-${panel.value} rf-size-m-${panel.sizeValue} rf-size-scope rounded-2xl bg-[#FCF9F2] border border-[#E4DCC8] p-4 sm:p-5 space-y-1.5`}
                   >
-                    <p className="text-[11px] font-semibold text-[#7A6F60]">
-                      নির্বাচিত প্রিভিউ: {selectedMeta.label}
+                    <p className="text-xs font-semibold text-[#7A6F60]">
+                      নির্বাচিত প্রিভিউ: {selectedMeta.label} · সাইজ: {selectedSizeMeta.label} ({selectedSizeMeta.scaleLabel})
                     </p>
                     <p className="font-recipe-diary-heading text-xl sm:text-2xl text-[#1F1A14] leading-snug">
                       শাহী কাচ্চি বিরিয়ানি
@@ -2308,6 +2536,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <p className="font-recipe-diary text-sm sm:text-base text-[#453C32] leading-relaxed">
                       খাসির মাংস ও সুগন্ধি বাসমতী চালের ঐতিহ্যবাহী ঘরোয়া রান্না।
                     </p>
+                  </div>
+
+                  {/* Font Size Selector for this Device */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-[#1A1A1A]">
+                      রেসিপি পোস্টের ফন্ট সাইজ
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {FONT_SIZE_OPTIONS.map((sizeOpt) => {
+                        const isSizeActive = panel.sizeValue === sizeOpt.key;
+                        return (
+                          <button
+                            key={sizeOpt.key}
+                            type="button"
+                            onClick={() => panel.onSizeChange(sizeOpt.key)}
+                            className={`px-3 py-2 rounded-xl border text-center transition-all cursor-pointer ${
+                              isSizeActive
+                                ? 'border-[#1B4D24] bg-[#EEF5EF]/80 text-[#1B4D24] ring-2 ring-[#1B4D24]/15'
+                                : 'border-gray-200 hover:border-[#1B4D24]/40 bg-white text-gray-700'
+                            }`}
+                          >
+                            <span className="block text-xs font-bold">{sizeOpt.label}</span>
+                            <span className="block text-[11px] opacity-80">{sizeOpt.scaleLabel}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   {/* Group 1: Handwriting Fonts */}

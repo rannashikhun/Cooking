@@ -147,6 +147,104 @@
   letter-spacing: var(--recipe-letter-spacing, 0.01em);
 }
 
+/* Dynamic Admin Panel Font & Font Size (Controlled from Admin Font Settings) */
+.admin-font-bensen {
+  --admin-font-family: 'Bensen Handwriting', 'Noto Serif Bengali', serif;
+  --admin-font-style: normal;
+  --admin-word-spacing: 0.14em;
+  --admin-letter-spacing: 0.01em;
+}
+.admin-font-atma {
+  --admin-font-family: 'Atma', 'Noto Serif Bengali', cursive, serif;
+  --admin-font-style: normal;
+  --admin-word-spacing: 0.1em;
+  --admin-letter-spacing: 0.01em;
+}
+.admin-font-tiro-italic {
+  --admin-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+  --admin-font-style: italic;
+  --admin-word-spacing: 0.08em;
+  --admin-letter-spacing: 0.005em;
+}
+.admin-font-noto-serif {
+  --admin-font-family: 'Noto Serif Bengali', Georgia, serif;
+  --admin-font-style: normal;
+  --admin-word-spacing: 0.03em;
+  --admin-letter-spacing: normal;
+}
+.admin-font-tiro {
+  --admin-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+  --admin-font-style: normal;
+  --admin-word-spacing: 0.04em;
+  --admin-letter-spacing: normal;
+}
+.admin-font-hind-siliguri {
+  --admin-font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
+  --admin-font-style: normal;
+  --admin-word-spacing: normal;
+  --admin-letter-spacing: normal;
+}
+.admin-font-noto-sans {
+  --admin-font-family: 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
+  --admin-font-style: normal;
+  --admin-word-spacing: normal;
+  --admin-letter-spacing: normal;
+}
+
+.admin-size-sm { --admin-scale: 0.9; }
+.admin-size-md { --admin-scale: 1; }
+.admin-size-lg { --admin-scale: 1.12; }
+.admin-size-xl { --admin-scale: 1.24; }
+
+.admin-typography-scope {
+  font-family: var(--admin-font-family, 'Hind Siliguri', system-ui, -apple-system, sans-serif);
+  font-style: var(--admin-font-style, normal);
+  word-spacing: var(--admin-word-spacing, normal);
+  letter-spacing: var(--admin-letter-spacing, normal);
+  font-size: calc(1rem * var(--admin-scale, 1));
+  --font-sans: var(--admin-font-family, 'Hind Siliguri', system-ui, -apple-system, sans-serif);
+  --font-display: var(--admin-font-family, 'Noto Serif Bengali', 'Hind Siliguri', serif);
+  --font-book: var(--admin-font-family, 'Noto Serif Bengali', Georgia, serif);
+  --text-xs: calc(0.75rem * var(--admin-scale, 1));
+  --text-sm: calc(0.875rem * var(--admin-scale, 1));
+  --text-base: calc(1rem * var(--admin-scale, 1));
+  --text-lg: calc(1.125rem * var(--admin-scale, 1));
+  --text-xl: calc(1.25rem * var(--admin-scale, 1));
+  --text-2xl: calc(1.5rem * var(--admin-scale, 1));
+  --text-3xl: calc(1.875rem * var(--admin-scale, 1));
+}
+
+.admin-typography-scope input,
+.admin-typography-scope textarea,
+.admin-typography-scope select,
+.admin-typography-scope button {
+  font-family: inherit;
+}
+
+/* Dynamic Responsive Recipe Post Font Size (PC & Mobile Separately) */
+.rf-size-m-sm { --rf-scale: 0.9; }
+.rf-size-m-md { --rf-scale: 1; }
+.rf-size-m-lg { --rf-scale: 1.12; }
+.rf-size-m-xl { --rf-scale: 1.24; }
+
+@media (min-width: 768px) {
+  .rf-size-pc-sm { --rf-scale: 0.9; }
+  .rf-size-pc-md { --rf-scale: 1; }
+  .rf-size-pc-lg { --rf-scale: 1.12; }
+  .rf-size-pc-xl { --rf-scale: 1.24; }
+}
+
+.rf-size-scope {
+  --text-xs: calc(0.75rem * var(--rf-scale, 1));
+  --text-sm: calc(0.875rem * var(--rf-scale, 1));
+  --text-base: calc(1rem * var(--rf-scale, 1));
+  --text-lg: calc(1.125rem * var(--rf-scale, 1));
+  --text-xl: calc(1.25rem * var(--rf-scale, 1));
+  --text-2xl: calc(1.5rem * var(--rf-scale, 1));
+  --text-3xl: calc(1.875rem * var(--rf-scale, 1));
+  --text-4xl: calc(2.25rem * var(--rf-scale, 1));
+}
+
 .font-numeral-bn {
   font-family: 'Noto Sans Bengali', system-ui, sans-serif;
 }

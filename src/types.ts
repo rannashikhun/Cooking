@@ -197,6 +197,8 @@ export type RecipeFontKey =
   | 'hind-siliguri'
   | 'noto-sans';
 
+export type FontSizeKey = 'sm' | 'md' | 'lg' | 'xl';
+
 export interface SiteSettings {
   siteName: string;
   tagline: string;
@@ -207,6 +209,10 @@ export interface SiteSettings {
   paymentInstructions?: string;
   recipeFontDesktop?: RecipeFontKey;
   recipeFontMobile?: RecipeFontKey;
+  recipeFontSizeDesktop?: FontSizeKey;
+  recipeFontSizeMobile?: FontSizeKey;
+  adminFontFamily?: RecipeFontKey;
+  adminFontSize?: FontSizeKey;
   contactEmail: string;
   contactPhone: string;
   contactAddress: string;
