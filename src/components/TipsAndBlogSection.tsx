@@ -10,8 +10,10 @@ import {
   MapPin,
   Phone,
   Send,
+  Share2,
 } from 'lucide-react';
 import { submitContactMessage } from '../services/firestoreService';
+import { shareCurrentPage } from '../utils/seoMeta';
 import type { BlogPost, CookingTip, PageRoute, SiteSettings } from '../types';
 
 const toBengaliDigits = (val: string | number): string => {
@@ -235,6 +237,8 @@ export const BlogDetailPage: React.FC<{
   post: BlogPost | undefined;
   onNavigate: (route: PageRoute) => void;
 }> = ({ post, onNavigate }) => {
+  const [shareCopied, setShareCopied] = useState(false);
+
   if (!post) {
     return (
       <section className="max-w-2xl mx-auto px-4 py-14 text-center space-y-4">
@@ -252,14 +256,34 @@ export const BlogDetailPage: React.FC<{
 
   return (
     <article className="max-w-3xl mx-auto px-4 sm:px-6 py-8 md:py-12 space-y-6">
-      <button
-        type="button"
-        onClick={() => onNavigate({ page: 'blog' })}
-        className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-[#1B4D24] cursor-pointer"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        সব ব্লগে ফিরে যান
-      </button>
+      <div className="flex items-center justify-between gap-4">
+        <button
+          type="button"
+          onClick={() => onNavigate({ page: 'blog' })}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-[#1B4D24] cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          সব ব্লগে ফিরে যান
+        </button>
+
+        <button
+          type="button"
+          onClick={async () => {
+            const res = await shareCurrentPage({
+              title: post.title,
+              text: post.excerpt,
+            });
+            if (res === 'copied') {
+              setShareCopied(true);
+              setTimeout(() => setShareCopied(false), 2400);
+            }
+          }}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold cursor-pointer transition-colors"
+        >
+          <Share2 className="w-3.5 h-3.5 text-[#1B4D24]" />
+          <span>{shareCopied ? 'লিংক কপি হয়েছে' : 'শেয়ার করুন'}</span>
+        </button>
+      </div>
 
       <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-xs">
         <img

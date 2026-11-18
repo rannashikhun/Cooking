@@ -511,6 +511,25 @@ export async function seedInitialDatabaseIfNeeded(force = false): Promise<boolea
             }
           }
         }
+        if (!localStorage.getItem('rs_migrated_default_seo_v2')) {
+          try {
+            const settingsSnap = await getDoc(doc(db, 'siteSettings', 'main'));
+            if (settingsSnap.exists()) {
+              await updateDoc(doc(db, 'siteSettings', 'main'), {
+                seoTitle: SEED_SETTINGS.seoTitle,
+                seoDescription: SEED_SETTINGS.seoDescription,
+                socialShareTitle: SEED_SETTINGS.socialShareTitle,
+                socialShareDescription: SEED_SETTINGS.socialShareDescription,
+                socialShareImageAlt: SEED_SETTINGS.socialShareImageAlt,
+                socialShareImageUrl: '',
+                updatedAt: serverTimestamp(),
+              });
+            }
+            localStorage.setItem('rs_migrated_default_seo_v2', '1');
+          } catch {
+            // Non-fatal if offline or non-admin
+          }
+        }
         return false;
       }
     }

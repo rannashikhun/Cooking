@@ -21,6 +21,7 @@ import {
   MessageSquare,
   Reply,
   Send,
+  Share2,
   Square,
   Star,
   Trash2,
@@ -40,6 +41,7 @@ import {
   recordRecipeViewHistory,
   saveLocalRecipeRead,
 } from '../services/firestoreService';
+import { shareCurrentPage } from '../utils/seoMeta';
 import type {
   FontSizeKey,
   PageRoute,
@@ -138,6 +140,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
   const [checkedIngredients, setCheckedIngredients] = useState<Record<number, boolean>>({});
   const [brokenStepImages, setBrokenStepImages] = useState<Record<number, boolean>>({});
   const [guestTick, setGuestTick] = useState(0);
+  const [shareCopied, setShareCopied] = useState(false);
 
   // Comments & threaded replies state
   const [comments, setComments] = useState<RecipeComment[]>([]);
@@ -528,18 +531,40 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
           <span>সব রেসিপিতে ফিরুন</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => onToggleFavorite(recipe.id)}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
-            isFavorite
-              ? 'border-[#B92B27]/40 bg-[#B92B27]/8 text-[#B92B27]'
-              : 'border-[#E2DAC6] bg-[#FCF9F2] hover:bg-[#F5EFE1] text-[#3D352B]'
-          }`}
-        >
-          <Heart className={`w-4 h-4 ${isFavorite ? 'fill-[#B92B27] text-[#B92B27]' : ''}`} />
-          <span>{isFavorite ? 'প্রিয় তালিকায় আছে' : 'প্রিয়তে রাখুন'}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {siteSettings?.showRecipeShareButton !== false && (
+            <button
+              type="button"
+              onClick={async () => {
+                const res = await shareCurrentPage({
+                  title: recipe.title,
+                  text: recipe.subtitle,
+                });
+                if (res === 'copied') {
+                  setShareCopied(true);
+                  setTimeout(() => setShareCopied(false), 2400);
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#E2DAC6] bg-[#FCF9F2] hover:bg-[#F5EFE1] text-[#3D352B] text-xs font-bold cursor-pointer transition-colors"
+            >
+              <Share2 className="w-3.5 h-3.5 text-[#1B4D24]" />
+              <span>{shareCopied ? 'লিংক কপি হয়েছে' : 'শেয়ার করুন'}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => onToggleFavorite(recipe.id)}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+              isFavorite
+                ? 'border-[#B92B27]/40 bg-[#B92B27]/8 text-[#B92B27]'
+                : 'border-[#E2DAC6] bg-[#FCF9F2] hover:bg-[#F5EFE1] text-[#3D352B]'
+            }`}
+          >
+            <Heart className={`w-4 h-4 ${isFavorite ? 'fill-[#B92B27] text-[#B92B27]' : ''}`} />
+            <span>{isFavorite ? 'প্রিয় তালিকায় আছে' : 'প্রিয়তে রাখুন'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Minimal Diary Sheet */}

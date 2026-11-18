@@ -276,6 +276,12 @@ service cloud.firestore {
           'recipeFontDesktop', 'recipeFontMobile',
           'recipeFontSizeDesktop', 'recipeFontSizeMobile',
           'adminFontFamily', 'adminFontSize',
+          'seoTitle', 'seoDescription', 'seoKeywords', 'seoAuthor',
+          'canonicalBaseUrl', 'seoRobotsPolicy',
+          'googleSiteVerification', 'googleVerificationFile',
+          'bingSiteVerification', 'googleAnalyticsId', 'robotsTxtExtra',
+          'socialShareImageUrl', 'socialShareTitle', 'socialShareDescription',
+          'socialShareImageAlt', 'twitterHandle', 'fbAppId', 'showRecipeShareButton',
           'contactEmail', 'contactPhone', 'contactAddress', 'footerNote', 'updatedAt'
         ]) &&
         data.siteName is string && data.siteName.size() >= 2 && data.siteName.size() <= 60 &&
@@ -291,6 +297,24 @@ service cloud.firestore {
         (!('recipeFontSizeMobile' in data) || (data.recipeFontSizeMobile is string && data.recipeFontSizeMobile in ['sm', 'md', 'lg', 'xl'])) &&
         (!('adminFontFamily' in data) || (data.adminFontFamily is string && data.adminFontFamily in ['bensen', 'atma', 'tiro-italic', 'noto-serif', 'tiro', 'hind-siliguri', 'noto-sans'])) &&
         (!('adminFontSize' in data) || (data.adminFontSize is string && data.adminFontSize in ['sm', 'md', 'lg', 'xl'])) &&
+        (!('seoTitle' in data) || (data.seoTitle is string && data.seoTitle.size() <= 120)) &&
+        (!('seoDescription' in data) || (data.seoDescription is string && data.seoDescription.size() <= 320)) &&
+        (!('seoKeywords' in data) || (data.seoKeywords is string && data.seoKeywords.size() <= 500)) &&
+        (!('seoAuthor' in data) || (data.seoAuthor is string && data.seoAuthor.size() <= 100)) &&
+        (!('canonicalBaseUrl' in data) || (data.canonicalBaseUrl is string && data.canonicalBaseUrl.size() <= 200)) &&
+        (!('seoRobotsPolicy' in data) || (data.seoRobotsPolicy is string && data.seoRobotsPolicy in ['index, follow', 'noindex, nofollow'])) &&
+        (!('googleSiteVerification' in data) || (data.googleSiteVerification is string && data.googleSiteVerification.size() <= 140)) &&
+        (!('googleVerificationFile' in data) || (data.googleVerificationFile is string && data.googleVerificationFile.size() <= 120)) &&
+        (!('bingSiteVerification' in data) || (data.bingSiteVerification is string && data.bingSiteVerification.size() <= 140)) &&
+        (!('googleAnalyticsId' in data) || (data.googleAnalyticsId is string && data.googleAnalyticsId.size() <= 40)) &&
+        (!('robotsTxtExtra' in data) || (data.robotsTxtExtra is string && data.robotsTxtExtra.size() <= 800)) &&
+        (!('socialShareImageUrl' in data) || (data.socialShareImageUrl is string && data.socialShareImageUrl.size() <= 350000)) &&
+        (!('socialShareTitle' in data) || (data.socialShareTitle is string && data.socialShareTitle.size() <= 120)) &&
+        (!('socialShareDescription' in data) || (data.socialShareDescription is string && data.socialShareDescription.size() <= 320)) &&
+        (!('socialShareImageAlt' in data) || (data.socialShareImageAlt is string && data.socialShareImageAlt.size() <= 160)) &&
+        (!('twitterHandle' in data) || (data.twitterHandle is string && data.twitterHandle.size() <= 60)) &&
+        (!('fbAppId' in data) || (data.fbAppId is string && data.fbAppId.size() <= 40)) &&
+        (!('showRecipeShareButton' in data) || data.showRecipeShareButton is bool) &&
         data.contactEmail is string && data.contactEmail.size() <= 120 &&
         data.contactPhone is string && data.contactPhone.size() <= 40 &&
         data.contactAddress is string && data.contactAddress.size() <= 200 &&

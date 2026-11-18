@@ -53,6 +53,7 @@ import {
   stripAppBase,
   withAppBase,
 } from './utils/appBase';
+import { applyRouteSeoMeta } from './utils/seoMeta';
 import type {
   ActiveTab,
   BlogPost,
@@ -194,6 +195,16 @@ export default function App() {
   useEffect(() => {
     setCategoryPageNum(1);
   }, [activeCategorySlug]);
+
+  useEffect(() => {
+    applyRouteSeoMeta({
+      route,
+      siteSettings,
+      recipes,
+      blogPosts,
+      tips,
+    });
+  }, [route, siteSettings, recipes, blogPosts, tips]);
 
   const showToast = useCallback((msg: string) => {
     setToastMsg(msg);

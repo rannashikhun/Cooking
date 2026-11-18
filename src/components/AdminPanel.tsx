@@ -10,6 +10,7 @@ import {
   Database,
   Edit3,
   ExternalLink,
+  Globe,
   ImagePlus,
   LayoutGrid,
   Mail,
@@ -18,6 +19,7 @@ import {
   Monitor,
   Plus,
   Settings,
+  Share2,
   ShieldCheck,
   Smartphone,
   Trash2,
@@ -54,6 +56,14 @@ import {
 } from '../services/firestoreService';
 import { CATEGORY_ICON_PRESETS, CategoryIcon, PresetFoodSvg } from './CategoryIcon';
 import { compressImageFileToDataUrl } from '../utils/imageUpload';
+import {
+  DEFAULT_SEO_DESCRIPTION,
+  DEFAULT_SEO_KEYWORDS,
+  DEFAULT_SEO_TITLE,
+  extractGoogleVerificationCode,
+  extractGoogleVerificationFilename,
+} from '../utils/seoMeta';
+import { AdminSeoSettingsTab, AdminSocialShareTab } from './AdminSocialSeoTabs';
 import type {
   BlogPost,
   ContactMessage,
@@ -83,7 +93,17 @@ interface AdminPanelProps {
   onNavigate?: (route: PageRoute) => void;
 }
 
-type AdminTab = 'recipes' | 'categories' | 'plans' | 'content' | 'users' | 'messages' | 'fonts' | 'settings';
+type AdminTab =
+  | 'recipes'
+  | 'categories'
+  | 'plans'
+  | 'content'
+  | 'users'
+  | 'messages'
+  | 'fonts'
+  | 'social'
+  | 'seo'
+  | 'settings';
 type MemberFilterView = 'all' | 'premium' | 'pending';
 
 const toBengaliDigits = (val: string | number): string => {
@@ -183,6 +203,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [sPhone, setSPhone] = useState(siteSettings.contactPhone);
   const [sAddress, setSAddress] = useState(siteSettings.contactAddress);
   const [sFooter, setSFooter] = useState(siteSettings.footerNote || '');
+  const [sSeoTitle, setSSeoTitle] = useState(
+    siteSettings.seoTitle || DEFAULT_SEO_TITLE
+  );
+  const [sSeoDescription, setSSeoDescription] = useState(
+    siteSettings.seoDescription || DEFAULT_SEO_DESCRIPTION
+  );
+  const [sSeoKeywords, setSSeoKeywords] = useState(
+    siteSettings.seoKeywords || DEFAULT_SEO_KEYWORDS
+  );
+  const [sSeoAuthor, setSSeoAuthor] = useState(
+    siteSettings.seoAuthor || siteSettings.siteName || 'রান্না শিখুন'
+  );
+  const [sCanonicalBaseUrl, setSCanonicalBaseUrl] = useState(
+    siteSettings.canonicalBaseUrl || ''
+  );
+  const [sSeoRobotsPolicy, setSSeoRobotsPolicy] = useState<'index, follow' | 'noindex, nofollow'>(
+    siteSettings.seoRobotsPolicy || 'index, follow'
+  );
+  const [sGoogleVerification, setSGoogleVerification] = useState(
+    siteSettings.googleSiteVerification || ''
+  );
+  const [sGoogleVerificationFile, setSGoogleVerificationFile] = useState(
+    siteSettings.googleVerificationFile || ''
+  );
+  const [sBingVerification, setSBingVerification] = useState(
+    siteSettings.bingSiteVerification || ''
+  );
+  const [sGoogleAnalyticsId, setSGoogleAnalyticsId] = useState(
+    siteSettings.googleAnalyticsId || ''
+  );
+  const [sRobotsTxtExtra, setSRobotsTxtExtra] = useState(
+    siteSettings.robotsTxtExtra || ''
+  );
+  const [sSocialImageUrl, setSSocialImageUrl] = useState(
+    siteSettings.socialShareImageUrl || ''
+  );
+  const [sSocialTitle, setSSocialTitle] = useState(
+    siteSettings.socialShareTitle || siteSettings.seoTitle || DEFAULT_SEO_TITLE
+  );
+  const [sSocialDesc, setSSocialDesc] = useState(
+    siteSettings.socialShareDescription ||
+      siteSettings.seoDescription ||
+      DEFAULT_SEO_DESCRIPTION
+  );
+  const [sSocialImageAlt, setSSocialImageAlt] = useState(
+    siteSettings.socialShareImageAlt || 'রান্না শিখুন — সহজে বাংলায় রান্না শেখার প্ল্যাটফর্ম'
+  );
+  const [sTwitterHandle, setSTwitterHandle] = useState(siteSettings.twitterHandle || '');
+  const [sFbAppId, setSFbAppId] = useState(siteSettings.fbAppId || '');
+  const [sShowRecipeShare, setSShowRecipeShare] = useState<boolean>(
+    siteSettings.showRecipeShareButton !== false
+  );
+  const [togglingRecipeShare, setTogglingRecipeShare] = useState(false);
+  const [socialImgUploading, setSocialImgUploading] = useState(false);
+  const [savingSocial, setSavingSocial] = useState(false);
+  const [savingSeo, setSavingSeo] = useState(false);
   const [sFontDesktop, setSFontDesktop] = useState<RecipeFontKey>(
     siteSettings.recipeFontDesktop || 'bensen'
   );
@@ -220,6 +296,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setSPhone(siteSettings.contactPhone);
     setSAddress(siteSettings.contactAddress);
     setSFooter(siteSettings.footerNote || '');
+    setSSeoTitle(siteSettings.seoTitle || DEFAULT_SEO_TITLE);
+    setSSeoDescription(siteSettings.seoDescription || DEFAULT_SEO_DESCRIPTION);
+    setSSeoKeywords(siteSettings.seoKeywords || DEFAULT_SEO_KEYWORDS);
+    setSSeoAuthor(siteSettings.seoAuthor || siteSettings.siteName || 'রান্না শিখুন');
+    setSCanonicalBaseUrl(siteSettings.canonicalBaseUrl || '');
+    setSSeoRobotsPolicy(siteSettings.seoRobotsPolicy || 'index, follow');
+    setSGoogleVerification(siteSettings.googleSiteVerification || '');
+    setSGoogleVerificationFile(siteSettings.googleVerificationFile || '');
+    setSBingVerification(siteSettings.bingSiteVerification || '');
+    setSGoogleAnalyticsId(siteSettings.googleAnalyticsId || '');
+    setSRobotsTxtExtra(siteSettings.robotsTxtExtra || '');
+    setSSocialImageUrl(siteSettings.socialShareImageUrl || '');
+    setSSocialTitle(
+      siteSettings.socialShareTitle || siteSettings.seoTitle || DEFAULT_SEO_TITLE
+    );
+    setSSocialDesc(
+      siteSettings.socialShareDescription ||
+        siteSettings.seoDescription ||
+        DEFAULT_SEO_DESCRIPTION
+    );
+    setSSocialImageAlt(
+      siteSettings.socialShareImageAlt || 'রান্না শিখুন — সহজে বাংলায় রান্না শেখার প্ল্যাটফর্ম'
+    );
+    setSTwitterHandle(siteSettings.twitterHandle || '');
+    setSFbAppId(siteSettings.fbAppId || '');
+    setSShowRecipeShare(siteSettings.showRecipeShareButton !== false);
     setSFontDesktop(siteSettings.recipeFontDesktop || 'bensen');
     setSFontMobile(siteSettings.recipeFontMobile || 'bensen');
     setSFontSizeDesktop(siteSettings.recipeFontSizeDesktop || 'md');
@@ -681,53 +783,126 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     notify('ব্লগ পোস্ট সংরক্ষণ করা হয়েছে!');
   };
 
+  const handleSocialImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setSocialImgUploading(true);
+    try {
+      const dataUrl = await compressImageFileToDataUrl(file, {
+        maxWidth: 1200,
+        maxHeight: 630,
+        quality: 0.84,
+        maxChars: 240000,
+      });
+      setSSocialImageUrl(dataUrl);
+      notify('সোশ্যাল শেয়ার ইমেজ যুক্ত হয়েছে! এবার "শেয়ার সেটিংস সংরক্ষণ করুন" বাটনে ক্লিক করুন।');
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'ইমেজ আপলোড করতে সমস্যা হয়েছে।');
+    } finally {
+      setSocialImgUploading(false);
+    }
+  };
+
+  const buildFullSettingsPayload = (
+    overrides?: Partial<Omit<SiteSettings, 'updatedAt'>>
+  ): Omit<SiteSettings, 'updatedAt'> => ({
+    siteName: sSiteName.trim() || siteSettings.siteName,
+    tagline: sTagline.trim() || siteSettings.tagline,
+    showAnnouncement: sShowAnnounce,
+    announcementText: sAnnounceText.trim().slice(0, 200),
+    paymentBkashNumber: sBkash.trim().slice(0, 40),
+    paymentNagadNumber: sNagad.trim().slice(0, 40),
+    paymentInstructions: sPayInst.trim().slice(0, 400),
+    recipeFontDesktop: sFontDesktop,
+    recipeFontMobile: sFontMobile,
+    recipeFontSizeDesktop: sFontSizeDesktop,
+    recipeFontSizeMobile: sFontSizeMobile,
+    adminFontFamily: sFontAdmin,
+    adminFontSize: sFontSizeAdmin,
+    seoTitle: (sSeoTitle.trim() || DEFAULT_SEO_TITLE).slice(0, 120),
+    seoDescription: (sSeoDescription.trim() || DEFAULT_SEO_DESCRIPTION).slice(0, 320),
+    seoKeywords: (sSeoKeywords.trim() || DEFAULT_SEO_KEYWORDS).slice(0, 500),
+    seoAuthor: (sSeoAuthor.trim() || sSiteName.trim() || 'রান্না শিখুন').slice(0, 100),
+    canonicalBaseUrl: sCanonicalBaseUrl.trim().replace(/\/+$/, '').slice(0, 200),
+    seoRobotsPolicy: sSeoRobotsPolicy,
+    googleSiteVerification: extractGoogleVerificationCode(sGoogleVerification),
+    googleVerificationFile: extractGoogleVerificationFilename(sGoogleVerificationFile),
+    bingSiteVerification: sBingVerification.trim().slice(0, 140),
+    googleAnalyticsId: sGoogleAnalyticsId.trim().slice(0, 40),
+    robotsTxtExtra: sRobotsTxtExtra.trim().slice(0, 800),
+    socialShareImageUrl: sSocialImageUrl.trim(),
+    socialShareTitle: (sSocialTitle.trim() || sSeoTitle.trim() || DEFAULT_SEO_TITLE).slice(0, 120),
+    socialShareDescription: (
+      sSocialDesc.trim() ||
+      sSeoDescription.trim() ||
+      DEFAULT_SEO_DESCRIPTION
+    ).slice(0, 320),
+    socialShareImageAlt: sSocialImageAlt.trim().slice(0, 160),
+    twitterHandle: sTwitterHandle.trim().slice(0, 60),
+    fbAppId: sFbAppId.trim().slice(0, 40),
+    showRecipeShareButton: sShowRecipeShare,
+    contactEmail: (sEmail.trim() || siteSettings.contactEmail).slice(0, 120),
+    contactPhone: (sPhone.trim() || siteSettings.contactPhone).slice(0, 40),
+    contactAddress: (sAddress.trim() || siteSettings.contactAddress).slice(0, 200),
+    footerNote: sFooter.trim().slice(0, 240),
+    ...overrides,
+  });
+
+  const handleToggleRecipeShareButton = async () => {
+    const nextVal = !sShowRecipeShare;
+    setSShowRecipeShare(nextVal);
+    setTogglingRecipeShare(true);
+    try {
+      await saveSiteSettingsAdmin(
+        buildFullSettingsPayload({ showRecipeShareButton: nextVal })
+      );
+      notify(
+        nextVal
+          ? 'রেসিপি পোস্টে "শেয়ার করুন" অপশন চালু করা হয়েছে!'
+          : 'রেসিপি পোস্টে "শেয়ার করুন" অপশন বন্ধ করা হয়েছে!'
+      );
+    } catch {
+      setSShowRecipeShare(!nextVal);
+      notify('সেটিংস আপডেট করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    } finally {
+      setTogglingRecipeShare(false);
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    await saveSiteSettingsAdmin({
-      siteName: sSiteName.trim(),
-      tagline: sTagline.trim(),
-      showAnnouncement: sShowAnnounce,
-      announcementText: sAnnounceText.trim(),
-      paymentBkashNumber: sBkash.trim(),
-      paymentNagadNumber: sNagad.trim(),
-      paymentInstructions: sPayInst.trim(),
-      recipeFontDesktop: sFontDesktop,
-      recipeFontMobile: sFontMobile,
-      recipeFontSizeDesktop: sFontSizeDesktop,
-      recipeFontSizeMobile: sFontSizeMobile,
-      adminFontFamily: sFontAdmin,
-      adminFontSize: sFontSizeAdmin,
-      contactEmail: sEmail.trim(),
-      contactPhone: sPhone.trim(),
-      contactAddress: sAddress.trim(),
-      footerNote: sFooter.trim(),
-    });
-    notify('সাইটের সেটিংস সফলভাবে আপডেট করা হয়েছে!');
+    await saveSiteSettingsAdmin(buildFullSettingsPayload());
+    notify('সাইট ও পেমেন্ট সেটিংস সফলভাবে আপডেট করা হয়েছে!');
+  };
+
+  const handleSaveSocialSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingSocial(true);
+    try {
+      await saveSiteSettingsAdmin(buildFullSettingsPayload());
+      notify('সোশ্যাল মিডিয়া শেয়ার সেটিংস সফলভাবে সংরক্ষণ করা হয়েছে!');
+    } finally {
+      setSavingSocial(false);
+    }
+  };
+
+  const handleSaveSeoSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingSeo(true);
+    try {
+      await saveSiteSettingsAdmin(buildFullSettingsPayload());
+      notify('SEO ও Google Search Console সেটিংস সফলভাবে সংরক্ষণ করা হয়েছে!');
+    } finally {
+      setSavingSeo(false);
+    }
   };
 
   const handleSaveFontSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingFonts(true);
     try {
-      await saveSiteSettingsAdmin({
-        siteName: siteSettings.siteName,
-        tagline: siteSettings.tagline,
-        showAnnouncement: siteSettings.showAnnouncement,
-        announcementText: siteSettings.announcementText || '',
-        paymentBkashNumber: siteSettings.paymentBkashNumber || '',
-        paymentNagadNumber: siteSettings.paymentNagadNumber || '',
-        paymentInstructions: siteSettings.paymentInstructions || '',
-        recipeFontDesktop: sFontDesktop,
-        recipeFontMobile: sFontMobile,
-        recipeFontSizeDesktop: sFontSizeDesktop,
-        recipeFontSizeMobile: sFontSizeMobile,
-        adminFontFamily: sFontAdmin,
-        adminFontSize: sFontSizeAdmin,
-        contactEmail: siteSettings.contactEmail,
-        contactPhone: siteSettings.contactPhone,
-        contactAddress: siteSettings.contactAddress,
-        footerNote: siteSettings.footerNote || '',
-      });
+      await saveSiteSettingsAdmin(buildFullSettingsPayload());
       notify('এডমিন প্যানেল ও রেসিপি পোস্টের ফন্ট এবং সাইজ সফলভাবে সংরক্ষণ করা হয়েছে!');
     } finally {
       setSavingFonts(false);
@@ -853,43 +1028,75 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       </div>
 
-      {/* Admin Navigation Tabs */}
-      <div className="mt-6 flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
-        {[
-          {
-            id: 'users',
-            label: `পেমেন্ট যাচাই ও সদস্য (${pendingOrders.length} অপেক্ষমাণ)`,
-            icon: Users,
-          },
-          { id: 'recipes', label: `রেসিপি (${recipes.length})`, icon: UtensilsCrossed },
-          { id: 'categories', label: `ক্যাটাগরি (${categories.length})`, icon: LayoutGrid },
-          { id: 'plans', label: 'সাবস্ক্রিপশন প্ল্যান', icon: CreditCard },
-          { id: 'content', label: 'টিপস ও ব্লগ', icon: BookOpen },
-          { id: 'messages', label: `বার্তা (${messagesList.length})`, icon: Mail },
-          { id: 'fonts', label: 'ফন্ট সেটিংস', icon: Type },
-          { id: 'settings', label: 'সাইট ও পেমেন্ট সেটিংস', icon: Settings },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const active = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                setExpandedEditor(null);
-                setActiveTab(tab.id as AdminTab);
-              }}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
-                active
-                  ? 'bg-[#1B4D24] text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          );
-        })}
+      {/* Admin Navigation Tabs — Two Centered Rows */}
+      <div className="mt-6 flex flex-col items-center gap-2.5">
+        {/* Row 1: Primary Operational Tabs */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {[
+            {
+              id: 'users',
+              label: `পেমেন্ট যাচাই ও সদস্য (${pendingOrders.length} অপেক্ষমাণ)`,
+              icon: Users,
+            },
+            { id: 'recipes', label: `রেসিপি (${recipes.length})`, icon: UtensilsCrossed },
+            { id: 'categories', label: `ক্যাটাগরি (${categories.length})`, icon: LayoutGrid },
+            { id: 'plans', label: 'সাবস্ক্রিপশন প্ল্যান', icon: CreditCard },
+            { id: 'content', label: 'টিপস ও ব্লগ', icon: BookOpen },
+            { id: 'messages', label: `বার্তা (${messagesList.length})`, icon: Mail },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setExpandedEditor(null);
+                  setActiveTab(tab.id as AdminTab);
+                }}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  active
+                    ? 'bg-[#1B4D24] text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Row 2: Font, Social Share, SEO & Site/Payment Settings (Centered) */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {[
+            { id: 'fonts', label: 'ফন্ট সেটিংস', icon: Type },
+            { id: 'social', label: 'সোশ্যাল মিডিয়া শেয়ার', icon: Share2 },
+            { id: 'seo', label: 'SEO সেটিংস', icon: Globe },
+            { id: 'settings', label: 'সাইট ও পেমেন্ট সেটিংস', icon: Settings },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setExpandedEditor(null);
+                  setActiveTab(tab.id as AdminTab);
+                }}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  active
+                    ? 'bg-[#1B4D24] text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* TAB 1: PAYMENT VERIFICATION, ORDERS & USERS */}
@@ -2671,7 +2878,76 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </form>
       )}
 
-      {/* TAB 7: SITE & PAYMENT SETTINGS */}
+      {/* TAB 7: SOCIAL MEDIA SHARE SETTINGS */}
+      {activeTab === 'social' && (
+        <AdminSocialShareTab
+          siteName={sSiteName}
+          seoTitle={sSeoTitle}
+          seoDescription={sSeoDescription}
+          canonicalBaseUrl={sCanonicalBaseUrl}
+          socialShareImageUrl={sSocialImageUrl}
+          onChangeSocialShareImageUrl={setSSocialImageUrl}
+          socialShareTitle={sSocialTitle}
+          onChangeSocialShareTitle={setSSocialTitle}
+          socialShareDescription={sSocialDesc}
+          onChangeSocialShareDescription={setSSocialDesc}
+          socialShareImageAlt={sSocialImageAlt}
+          onChangeSocialShareImageAlt={setSSocialImageAlt}
+          twitterHandle={sTwitterHandle}
+          onChangeTwitterHandle={setSTwitterHandle}
+          fbAppId={sFbAppId}
+          onChangeFbAppId={setSFbAppId}
+          showRecipeShareButton={sShowRecipeShare}
+          onToggleRecipeShareButton={handleToggleRecipeShareButton}
+          togglingRecipeShare={togglingRecipeShare}
+          uploading={socialImgUploading}
+          onUploadImage={handleSocialImageUpload}
+          onSave={handleSaveSocialSettings}
+          saving={savingSocial}
+          recipes={recipes}
+          blogPosts={blogPosts}
+          onNotify={notify}
+        />
+      )}
+
+      {/* TAB 8: SEO & GOOGLE SEARCH CONSOLE SETTINGS */}
+      {activeTab === 'seo' && (
+        <AdminSeoSettingsTab
+          siteName={sSiteName}
+          seoTitle={sSeoTitle}
+          onChangeSeoTitle={setSSeoTitle}
+          seoDescription={sSeoDescription}
+          onChangeSeoDescription={setSSeoDescription}
+          seoKeywords={sSeoKeywords}
+          onChangeSeoKeywords={setSSeoKeywords}
+          seoAuthor={sSeoAuthor}
+          onChangeSeoAuthor={setSSeoAuthor}
+          canonicalBaseUrl={sCanonicalBaseUrl}
+          onChangeCanonicalBaseUrl={setSCanonicalBaseUrl}
+          seoRobotsPolicy={sSeoRobotsPolicy}
+          onChangeSeoRobotsPolicy={setSSeoRobotsPolicy}
+          googleSiteVerification={sGoogleVerification}
+          onChangeGoogleSiteVerification={setSGoogleVerification}
+          googleVerificationFile={sGoogleVerificationFile}
+          onChangeGoogleVerificationFile={setSGoogleVerificationFile}
+          bingSiteVerification={sBingVerification}
+          onChangeBingSiteVerification={setSBingVerification}
+          googleAnalyticsId={sGoogleAnalyticsId}
+          onChangeGoogleAnalyticsId={setSGoogleAnalyticsId}
+          robotsTxtExtra={sRobotsTxtExtra}
+          onChangeRobotsTxtExtra={setSRobotsTxtExtra}
+          socialShareImageUrl={sSocialImageUrl}
+          onSave={handleSaveSeoSettings}
+          saving={savingSeo}
+          recipes={recipes}
+          blogPosts={blogPosts}
+          tips={tips}
+          categories={categories}
+          onNotify={notify}
+        />
+      )}
+
+      {/* TAB 9: SITE & PAYMENT SETTINGS */}
       {activeTab === 'settings' && (
         <form
           onSubmit={handleSaveSettings}
