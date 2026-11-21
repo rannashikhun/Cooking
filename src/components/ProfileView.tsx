@@ -567,7 +567,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
       {/* Tabbed Free Recipes, Permanently Unlocked Premium Recipes & Favorite Recipes */}
       <div className="bg-white rounded-3xl border border-gray-200 p-6 sm:p-7">
-        <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 pb-4 mb-5">
+        <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 border-b border-gray-100 pb-4 mb-5">
           <button
             type="button"
             onClick={() => setActiveRecipeTab('free')}
@@ -597,7 +597,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <button
             type="button"
             onClick={() => setActiveRecipeTab('favorites')}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer ${
+            className={`hidden md:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer ${
               activeRecipeTab === 'favorites'
                 ? 'bg-[#B92B27] text-white shadow-xs'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
