@@ -95,7 +95,10 @@ export type NotificationType =
   | 'comment_reply'
   | 'payment_approved'
   | 'payment_rejected'
-  | 'payment_pending';
+  | 'payment_pending'
+  | 'free_limit_reached'
+  | 'pro_limit_reached'
+  | 'plan_expiry_reminder';
 
 export interface UserNotification {
   id: string;
@@ -140,6 +143,9 @@ export interface UserProfile {
   lastOrderId?: string;
   favoriteRecipeIds: string[];
   unlockedRecipeIds?: string[];
+  freeUnlockedRecipeIds?: string[];
+  premiumUnlockedRecipeIds?: string[];
+  premiumRecipeQuota?: number;
   viewedHistory?: RecipeHistoryEntry[];
   createdAt?: unknown;
   updatedAt?: unknown;
@@ -154,6 +160,7 @@ export interface SubscriptionOrder {
   planName: string;
   planTier: PlanTier;
   durationDays: number;
+  recipeLimit?: number;
   amount: number;
   paymentMethod: 'বিকাশ' | 'নগদ' | 'রকেট' | 'ব্যাংক' | 'ফ্রি';
   senderNumber: string;
@@ -213,6 +220,8 @@ export interface SiteSettings {
   recipeFontSizeMobile?: FontSizeKey;
   adminFontFamily?: RecipeFontKey;
   adminFontSize?: FontSizeKey;
+  profileFontFamily?: RecipeFontKey;
+  profileFontSize?: FontSizeKey;
   seoTitle?: string;
   seoDescription?: string;
   seoKeywords?: string;

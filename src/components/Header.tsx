@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  AlertTriangle,
   Bell,
   BookOpen,
   CheckCheck,
@@ -20,6 +21,7 @@ import {
 import { Timestamp } from 'firebase/firestore';
 import { BrandMark } from './BrandMark';
 import { CategoryIcon } from './CategoryIcon';
+import { PHONE_EMAIL_DOMAIN, formatUserContact } from '../services/firestoreService';
 import type { ActiveTab, RecipeCategory, UserNotification, UserProfile } from '../types';
 
 interface HeaderProps {
@@ -408,9 +410,13 @@ export const Header: React.FC<HeaderProps> = ({
                           ? 'bg-[#1B4D24]/12 text-[#1B4D24]'
                           : n.type === 'payment_approved'
                             ? 'bg-emerald-100 text-emerald-700'
-                            : n.type === 'payment_rejected'
+                            : n.type === 'payment_rejected' || n.type === 'free_limit_reached'
                               ? 'bg-red-100 text-red-600'
-                              : 'bg-amber-100 text-amber-700'
+                              : n.type === 'pro_limit_reached'
+                                ? 'bg-amber-100 text-[#9A6E04]'
+                                : n.type === 'plan_expiry_reminder'
+                                  ? 'bg-orange-100 text-orange-700'
+                                  : 'bg-amber-100 text-amber-700'
                       }`}
                     >
                       {n.type === 'comment_reply' ? (
@@ -419,6 +425,10 @@ export const Header: React.FC<HeaderProps> = ({
                         <CheckCircle2 className="w-4 h-4" />
                       ) : n.type === 'payment_rejected' ? (
                         <XCircle className="w-4 h-4" />
+                      ) : n.type === 'free_limit_reached' || n.type === 'plan_expiry_reminder' ? (
+                        <AlertTriangle className="w-4 h-4" />
+                      ) : n.type === 'pro_limit_reached' ? (
+                        <Crown className="w-4 h-4" />
                       ) : (
                         <Clock className="w-4 h-4" />
                       )}
@@ -631,12 +641,25 @@ export const Header: React.FC<HeaderProps> = ({
               {user ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2.5 px-2">
-                    <div className="w-9 h-9 rounded-full bg-[#1B4D24] text-white flex items-center justify-center font-bold text-sm">
-                      {user.displayName.charAt(0)}
+                    <div className="w-9 h-9 rounded-full bg-[#1B4D24] text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
+                      {user.photoURL ? (
+                        <img
+                          src={user.photoURL}
+                          alt={user.displayName}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        user.displayName.charAt(0)
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-gray-900 truncate">{user.displayName}</p>
-                      <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {user.email && !user.email.endsWith(PHONE_EMAIL_DOMAIN)
+                          ? user.email
+                          : formatUserContact(user.email, user.phoneNumber)}
+                      </p>
                     </div>
                   </div>
                   <button

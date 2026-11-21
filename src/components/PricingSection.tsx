@@ -139,7 +139,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
                           ? 'অ্যাকাউন্টে চালু আছে'
                           : 'বিনামূল্যে অন্তর্ভুক্ত'
                         : isCurrent
-                          ? 'বর্তমান সক্রিয় প্ল্যান'
+                          ? 'প্ল্যান রিনিউ / কোটা বাড়ান'
                           : 'অ্যাক্টিভেট করুন';
 
                       return (

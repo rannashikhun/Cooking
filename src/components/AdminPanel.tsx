@@ -277,6 +277,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [sFontSizeAdmin, setSFontSizeAdmin] = useState<FontSizeKey>(
     siteSettings.adminFontSize || 'md'
   );
+  const [sFontProfile, setSFontProfile] = useState<RecipeFontKey>(
+    siteSettings.profileFontFamily || 'hind-siliguri'
+  );
+  const [sFontSizeProfile, setSFontSizeProfile] = useState<FontSizeKey>(
+    siteSettings.profileFontSize || 'md'
+  );
   const [savingFonts, setSavingFonts] = useState(false);
 
   const notify = (msg: string) => {
@@ -328,6 +334,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setSFontSizeMobile(siteSettings.recipeFontSizeMobile || 'md');
     setSFontAdmin(siteSettings.adminFontFamily || 'hind-siliguri');
     setSFontSizeAdmin(siteSettings.adminFontSize || 'md');
+    setSFontProfile(siteSettings.profileFontFamily || 'hind-siliguri');
+    setSFontSizeProfile(siteSettings.profileFontSize || 'md');
   }, [siteSettings]);
 
   useEffect(() => {
@@ -820,6 +828,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     recipeFontSizeMobile: sFontSizeMobile,
     adminFontFamily: sFontAdmin,
     adminFontSize: sFontSizeAdmin,
+    profileFontFamily: sFontProfile,
+    profileFontSize: sFontSizeProfile,
     seoTitle: (sSeoTitle.trim() || DEFAULT_SEO_TITLE).slice(0, 120),
     seoDescription: (sSeoDescription.trim() || DEFAULT_SEO_DESCRIPTION).slice(0, 320),
     seoKeywords: (sSeoKeywords.trim() || DEFAULT_SEO_KEYWORDS).slice(0, 500),
@@ -903,7 +913,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setSavingFonts(true);
     try {
       await saveSiteSettingsAdmin(buildFullSettingsPayload());
-      notify('এডমিন প্যানেল ও রেসিপি পোস্টের ফন্ট এবং সাইজ সফলভাবে সংরক্ষণ করা হয়েছে!');
+      notify('এডমিন প্যানেল, ইউজার প্রোফাইল ও রেসিপি পোস্টের ফন্ট এবং সাইজ সফলভাবে সংরক্ষণ করা হয়েছে!');
     } finally {
       setSavingFonts(false);
     }
@@ -1150,8 +1160,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <button
                         type="button"
                         onClick={async () => {
-                          await approveSubscriptionOrderAdmin(o);
-                          notify(`${o.userName}-এর ${o.planName} প্ল্যান অনুমোদন ও সক্রিয় করা হয়েছে!`);
+                          await approveSubscriptionOrderAdmin(o, plans);
+                          notify(`${o.userName}-এর ${o.planName} প্ল্যান অনুমোদন ও কোটা যোগ করা হয়েছে!`);
                         }}
                         className="px-4 py-2 rounded-xl bg-[#1B4D24] hover:bg-[#143A1B] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                       >
@@ -1234,6 +1244,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <UserControlRow
                         key={u.uid}
                         user={u}
+                        plans={plans}
                         currentAdminUid={currentUser.uid}
                         onUpdated={() => notify(`${u.displayName}-এর তথ্য আপডেট হয়েছে।`)}
                       />
@@ -2465,10 +2476,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-[#1A1A1A]">
-                ফন্ট ও ফন্ট সাইজ সেটিংস (এডমিন প্যানেল ও রেসিপি পোস্ট)
+                ফন্ট ও ফন্ট সাইজ সেটিংস (এডমিন প্যানেল, ইউজার প্রোফাইল ও রেসিপি পোস্ট)
               </h2>
               <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                এডমিন প্যানেলের নিজস্ব ফন্ট ও ফন্ট সাইজ এবং রেসিপি পোস্টের PC ও মোবাইল ভার্সনের আলাদা ফন্ট ও সাইজ এখান থেকে পরিবর্তন করুন।
+                এডমিন প্যানেল, ইউজার প্রোফাইল এবং রেসিপি পোস্টের PC ও মোবাইল ভার্সনের আলাদা বাংলা ফন্ট ও সাইজ এখান থেকে পরিবর্তন করুন।
               </p>
             </div>
             <button
@@ -2662,6 +2673,201 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               className={`rf-m-${opt.key} font-recipe-diary text-base text-[#241E17] mt-2 pt-2 border-t border-dashed border-gray-200`}
                             >
                               নমুনা: আজকের পেমেন্ট ও রেসিপি তালিকা যাচাই করুন।
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* SECTION 1B: USER PROFILE FONT & FONT SIZE */}
+          {(() => {
+            const profileBookFonts = RECIPE_FONT_OPTIONS.filter((f) => f.category === 'book');
+            const profileHandFonts = RECIPE_FONT_OPTIONS.filter(
+              (f) => f.category === 'handwriting'
+            );
+            const selectedProfileFont =
+              RECIPE_FONT_OPTIONS.find((f) => f.key === sFontProfile) || RECIPE_FONT_OPTIONS[0];
+            const selectedProfileSize =
+              FONT_SIZE_OPTIONS.find((s) => s.key === sFontSizeProfile) || FONT_SIZE_OPTIONS[1];
+
+            return (
+              <div className="bg-white rounded-2xl border border-[#C69214]/40 p-5 sm:p-6 space-y-5 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-[#9A6E04] flex items-center justify-center shrink-0">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-[#1A1A1A]">
+                        ইউজার প্রোফাইলের ফন্ট ও ফন্ট সাইজ
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        ইউজার প্রোফাইল পেজের ফ্রি/প্রিমিয়াম রেসিপি ট্যাব, নোটিফিকেশন ও সাবস্ক্রিপশন অংশের বাংলা ফন্ট এখান থেকে বদলান
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSFontProfile('hind-siliguri');
+                      setSFontSizeProfile('md');
+                    }}
+                    className="self-start sm:self-auto px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-xs font-semibold text-gray-700 cursor-pointer"
+                  >
+                    ডিফল্ট রিসেট
+                  </button>
+                </div>
+
+                {/* Live User Profile Preview */}
+                <div
+                  className={`profile-typography-scope profile-font-${sFontProfile} profile-size-${sFontSizeProfile} rounded-2xl bg-[#FFFDF7] border border-amber-200/80 p-4 sm:p-5 space-y-2`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-[#9A6E04]">
+                    <span>
+                      লাইভ প্রোফাইল প্রিভিউ: {selectedProfileFont.label} · সাইজ: {selectedProfileSize.label} ({selectedProfileSize.scaleLabel})
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-[#9A6E04]">
+                      ইউজার প্রোফাইলে প্রযোজ্য
+                    </span>
+                  </div>
+                  <p className="text-lg sm:text-xl font-bold text-[#1A1A1A] leading-snug">
+                    সদস্য প্রোফাইল — ফ্রি ও প্রিমিয়াম রেসিপি সংগ্রহ
+                  </p>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    আপনার আনলক করা প্রিমিয়াম রেসিপিগুলো সবসময় আপনার প্রোফাইলে সংরক্ষিত থাকবে এবং প্ল্যানের মেয়াদ ও কোটা এখান থেকে দেখা যাবে।
+                  </p>
+                </div>
+
+                {/* User Profile Font Size Picker */}
+                <div className="space-y-2.5">
+                  <p className="text-xs font-bold text-[#1A1A1A]">
+                    ইউজার প্রোফাইলের ফন্ট সাইজ বাছাই করুন
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {FONT_SIZE_OPTIONS.map((sizeOpt) => {
+                      const active = sFontSizeProfile === sizeOpt.key;
+                      return (
+                        <button
+                          key={sizeOpt.key}
+                          type="button"
+                          onClick={() => setSFontSizeProfile(sizeOpt.key)}
+                          className={`text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                            active
+                              ? 'border-[#C69214] bg-amber-50/80 ring-2 ring-[#C69214]/20'
+                              : 'border-gray-200 hover:border-[#C69214]/50 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-sm font-bold text-[#1A1A1A]">
+                              {sizeOpt.label}
+                            </span>
+                            <span
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                active
+                                  ? 'bg-[#C69214] text-white'
+                                  : 'bg-gray-100 text-gray-600'
+                              }`}
+                            >
+                              {sizeOpt.scaleLabel}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-500 mt-1 leading-snug">
+                            {sizeOpt.description}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* User Profile Bengali Font Family Picker */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="space-y-2.5">
+                    <p className="text-xs font-bold text-[#1B4D24] tracking-wide">
+                      পরিষ্কার প্রিন্ট ও বইয়ের বাংলা ফন্ট
+                    </p>
+                    <div className="space-y-2">
+                      {profileBookFonts.map((opt) => {
+                        const isSelected = sFontProfile === opt.key;
+                        return (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => setSFontProfile(opt.key)}
+                            className={`w-full text-left p-3.5 rounded-xl border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-[#C69214] bg-amber-50/70 ring-2 ring-[#C69214]/20'
+                                : 'border-gray-200 hover:border-[#C69214]/50 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-bold text-[#1A1A1A]">
+                                {opt.label}
+                              </span>
+                              <span
+                                className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                  isSelected
+                                    ? 'bg-[#C69214] text-white'
+                                    : 'bg-gray-100 text-gray-500'
+                                }`}
+                              >
+                                {isSelected ? 'নির্বাচিত' : 'বাছাই করুন'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
+                            <p
+                              className={`rf-m-${opt.key} font-recipe-diary text-base text-[#241E17] mt-2 pt-2 border-t border-dashed border-gray-200`}
+                            >
+                              নমুনা: আপনার ফ্রি ও প্রিমিয়াম রেসিপি এবং প্রো প্ল্যান স্ট্যাটাস।
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <p className="text-xs font-bold text-[#B92B27] tracking-wide">
+                      হাতের লেখার মতো স্টাইলিশ বাংলা ফন্ট
+                    </p>
+                    <div className="space-y-2">
+                      {profileHandFonts.map((opt) => {
+                        const isSelected = sFontProfile === opt.key;
+                        return (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => setSFontProfile(opt.key)}
+                            className={`w-full text-left p-3.5 rounded-xl border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-[#C69214] bg-amber-50/70 ring-2 ring-[#C69214]/20'
+                                : 'border-gray-200 hover:border-[#C69214]/50 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-bold text-[#1A1A1A]">
+                                {opt.label}
+                              </span>
+                              <span
+                                className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                  isSelected
+                                    ? 'bg-[#C69214] text-white'
+                                    : 'bg-gray-100 text-gray-500'
+                                }`}
+                              >
+                                {isSelected ? 'নির্বাচিত' : 'বাছাই করুন'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
+                            <p
+                              className={`rf-m-${opt.key} font-recipe-diary text-base text-[#241E17] mt-2 pt-2 border-t border-dashed border-gray-200`}
+                            >
+                              নমুনা: আপনার ফ্রি ও প্রিমিয়াম রেসিপি এবং প্রো প্ল্যান স্ট্যাটাস।
                             </p>
                           </button>
                         );
@@ -3209,9 +3415,10 @@ const PlanEditorCard: React.FC<{
 
 const UserControlRow: React.FC<{
   user: UserProfile;
+  plans: SubscriptionPlan[];
   currentAdminUid: string;
   onUpdated: () => void;
-}> = ({ user, currentAdminUid, onUpdated }) => {
+}> = ({ user, plans, currentAdminUid, onUpdated }) => {
   const [plan, setPlan] = useState<PlanTier>(user.subscriptionPlan);
   const [status, setStatus] = useState<'active' | 'expired'>(user.subscriptionStatus);
   const [role, setRole] = useState<'member' | 'admin'>(user.role);
@@ -3259,13 +3466,17 @@ const UserControlRow: React.FC<{
         <button
           type="button"
           onClick={async () => {
-            await updateUserByAdmin(user.uid, {
-              subscriptionPlan: plan,
-              subscriptionStatus: status,
-              role,
-              email: user.email,
-              currentAdminUid,
-            });
+            await updateUserByAdmin(
+              user.uid,
+              {
+                subscriptionPlan: plan,
+                subscriptionStatus: status,
+                role,
+                email: user.email,
+                currentAdminUid,
+              },
+              plans
+            );
             onUpdated();
           }}
           className="px-3 py-1.5 rounded-lg bg-[#1B4D24] text-white text-xs font-bold cursor-pointer"

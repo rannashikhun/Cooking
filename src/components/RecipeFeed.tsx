@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Heart, Lock, Search, Star } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, Heart, Lock, Search, Star } from 'lucide-react';
 import { CategoryStrip } from './CategoryIcon';
 import type { Recipe, RecipeCategory } from '../types';
 
@@ -15,6 +15,10 @@ interface RecipeFeedProps {
   hasActiveSubscription: boolean;
   unlockedIds?: string[];
   quotaLimit?: number;
+  freeUnlockedIds?: string[];
+  premiumUnlockedIds?: string[];
+  premiumQuotaLimit?: number;
+  freeQuotaLimit?: number;
   title?: string;
   categories?: RecipeCategory[];
   hideSearchAndFilters?: boolean;
@@ -65,6 +69,10 @@ export const RecipeFeed: React.FC<RecipeFeedProps> = ({
   hasActiveSubscription,
   unlockedIds,
   quotaLimit,
+  freeUnlockedIds,
+  premiumUnlockedIds,
+  premiumQuotaLimit,
+  freeQuotaLimit = 10,
   title = 'সব জনপ্রিয় রেসিপি',
   categories = [],
   hideSearchAndFilters = false,
@@ -96,10 +104,50 @@ export const RecipeFeed: React.FC<RecipeFeedProps> = ({
   const effectivePageSize = isDesktop && desktopPageSize ? desktopPageSize : pageSize;
   const currentPage = controlledPage ?? internalPage;
 
-  const isQuotaFull =
+  const isLegacyQuotaFull =
     quotaLimit !== undefined &&
     unlockedIds !== undefined &&
     unlockedIds.length >= quotaLimit;
+
+  const getRecipeAccessVisual = (recipe: Recipe) => {
+    const isPermUnlocked = Boolean(recipe.isPremium && premiumUnlockedIds?.includes(recipe.id));
+    if (recipe.isPremium) {
+      if (isPermUnlocked) {
+        return { isBlocked: false, isPermUnlocked: true, ctaLabel: 'বিস্তারিত দেখুন' };
+      }
+      if (!hasActiveSubscription) {
+        return { isBlocked: true, isPermUnlocked: false, ctaLabel: 'আনলক করুন' };
+      }
+      if (
+        premiumQuotaLimit !== undefined &&
+        premiumUnlockedIds !== undefined &&
+        premiumUnlockedIds.length >= premiumQuotaLimit
+      ) {
+        return { isBlocked: true, isPermUnlocked: false, ctaLabel: 'কোটা পূর্ণ' };
+      }
+      return { isBlocked: false, isPermUnlocked: false, ctaLabel: 'বিস্তারিত দেখুন' };
+    }
+
+    // Free recipe
+    if (hasActiveSubscription) {
+      return { isBlocked: false, isPermUnlocked: false, ctaLabel: 'রেসিপি দেখুন' };
+    }
+    if (freeUnlockedIds !== undefined) {
+      if (freeUnlockedIds.includes(recipe.id)) {
+        return { isBlocked: false, isPermUnlocked: false, ctaLabel: 'রেসিপি দেখুন' };
+      }
+      if (freeUnlockedIds.length >= freeQuotaLimit) {
+        return { isBlocked: true, isPermUnlocked: false, ctaLabel: 'ফ্রি লিমিট শেষ' };
+      }
+      return { isBlocked: false, isPermUnlocked: false, ctaLabel: 'রেসিপি দেখুন' };
+    }
+    const lockedByQuota = Boolean(isLegacyQuotaFull && !unlockedIds?.includes(recipe.id));
+    return {
+      isBlocked: lockedByQuota,
+      isPermUnlocked: false,
+      ctaLabel: lockedByQuota ? 'কোটা পূর্ণ' : 'রেসিপি দেখুন',
+    };
+  };
 
   const filteredRecipes = useMemo(() => {
     const matched = recipes.filter((r) => {
@@ -249,8 +297,7 @@ export const RecipeFeed: React.FC<RecipeFeedProps> = ({
       <div className="md:hidden space-y-5">
         {paginatedRecipes.map((recipe) => {
           const isFav = favoriteIds.includes(recipe.id);
-          const lockedByQuota = Boolean(isQuotaFull && !unlockedIds?.includes(recipe.id));
-          const isBlocked = (recipe.isPremium && !hasActiveSubscription) || lockedByQuota;
+          const { isBlocked, isPermUnlocked, ctaLabel } = getRecipeAccessVisual(recipe);
           return (
             <article key={recipe.id} className="bg-white">
               {/* Image Container */}
@@ -271,10 +318,17 @@ export const RecipeFeed: React.FC<RecipeFeedProps> = ({
                 {/* Top-Right Free/Premium Badge */}
                 <div className="absolute top-2.5 right-2.5">
                   {recipe.isPremium ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#E5B83B] text-[#1A1A1A] text-xs font-bold shadow">
-                      <Lock className="w-3 h-3" />
-                      প্রিমিয়াম
-                    </span>
+                    isPermUnlocked ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-xs font-bold shadow">
+                        <CheckCircle2 className="w-3 h-3" />
+                        আনলকড
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#E5B83B] text-[#1A1A1A] text-xs font-bold shadow">
+                        <Lock className="w-3 h-3" />
+                        প্রিমিয়াম
+                      </span>
+                    )
                   ) : (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#1B4D24] text-white text-xs font-bold shadow">
                       বিনামূল্যে
@@ -339,13 +393,7 @@ export const RecipeFeed: React.FC<RecipeFeedProps> = ({
                   }`}
                 >
                   {isBlocked && <Lock className="w-3.5 h-3.5" />}
-                  {lockedByQuota
-                    ? 'কোটা পূর্ণ'
-                    : recipe.isPremium
-                      ? hasActiveSubscription
-                        ? 'বিস্তারিত দেখুন'
-                        : 'আনলক করুন'
-                      : 'রেসিপি দেখুন'}
+                  {ctaLabel}
                 </button>
               </div>
             </article>
@@ -357,8 +405,7 @@ export const RecipeFeed: React.FC<RecipeFeedProps> = ({
       <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-7">
         {paginatedRecipes.map((recipe) => {
           const isFav = favoriteIds.includes(recipe.id);
-          const lockedByQuota = Boolean(isQuotaFull && !unlockedIds?.includes(recipe.id));
-          const isBlocked = (recipe.isPremium && !hasActiveSubscription) || lockedByQuota;
+          const { isBlocked, isPermUnlocked, ctaLabel } = getRecipeAccessVisual(recipe);
           return (
             <article
               key={recipe.id}
@@ -390,10 +437,17 @@ export const RecipeFeed: React.FC<RecipeFeedProps> = ({
 
                 <div className="absolute top-3 right-3">
                   {recipe.isPremium ? (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#E5B83B] text-[#1A1A1A] text-xs font-bold shadow-xs">
-                      <Lock className="w-3 h-3" />
-                      প্রিমিয়াম
-                    </span>
+                    isPermUnlocked ? (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-bold shadow-xs">
+                        <CheckCircle2 className="w-3 h-3" />
+                        আনলকড
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#E5B83B] text-[#1A1A1A] text-xs font-bold shadow-xs">
+                        <Lock className="w-3 h-3" />
+                        প্রিমিয়াম
+                      </span>
+                    )
                   ) : (
                     <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#1B4D24] text-white text-xs font-bold shadow-xs">
                       বিনামূল্যে
@@ -439,13 +493,7 @@ export const RecipeFeed: React.FC<RecipeFeedProps> = ({
                     }`}
                   >
                     {isBlocked && <Lock className="w-3.5 h-3.5" />}
-                    {lockedByQuota
-                      ? 'কোটা পূর্ণ'
-                      : recipe.isPremium
-                        ? hasActiveSubscription
-                          ? 'বিস্তারিত দেখুন'
-                          : 'আনলক করুন'
-                        : 'রেসিপি দেখুন'}
+                    {ctaLabel}
                   </button>
                 </div>
               </div>

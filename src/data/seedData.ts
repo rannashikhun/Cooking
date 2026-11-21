@@ -576,6 +576,8 @@ export const SEED_SETTINGS: Omit<SiteSettings, 'updatedAt'> = {
   recipeFontSizeMobile: 'md',
   adminFontFamily: 'hind-siliguri',
   adminFontSize: 'md',
+  profileFontFamily: 'hind-siliguri',
+  profileFontSize: 'md',
   seoTitle: 'রান্না শিখুন — সহজে বাংলায় রান্না শেখার প্ল্যাটফর্ম',
   seoDescription: 'সম্পূর্ণ বাংলায় রান্না শিখুন — ধাপে ধাপে ছবিসহ দেশি বিদেশী ও চাইনিজ রেসিপি, রান্না শিখার বিশ্বস্ত ঠিকানা।',
   seoKeywords: 'বাংলা রান্না, বাঙালি রেসিপি, ঘরোয়া রান্না, সরষে ইলিশ, মাটন কারি, রন্ধন শিল্প, রান্না শিখুন',

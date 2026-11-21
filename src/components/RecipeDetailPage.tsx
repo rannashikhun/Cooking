@@ -10,6 +10,7 @@ import {
 import { FONT_SIZE_OPTIONS, RECIPE_FONT_OPTIONS, SEED_RECIPES } from '../data/seedData';
 import {
   ArrowLeft,
+  CheckCircle2,
   CheckSquare,
   ChefHat,
   ChevronLeft,
@@ -31,13 +32,20 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import {
+  FREE_RECIPE_LIMIT,
   GUEST_READS_KEY,
   addRecipeComment,
   deleteRecipeComment,
   fetchRecipeContent,
-  getEffectiveUsedRecipeIds,
-  getRecipeQuotaLimit,
-  recordRecipeUnlock,
+  getRemainingNewPremiumSlots,
+  getUserFreeUnlockedIds,
+  getUserPremiumQuota,
+  getUserPremiumUnlockedIds,
+  isPaidPlanActive,
+  notifyFreeLimitReached,
+  notifyProLimitReached,
+  recordFreeRecipeUnlock,
+  recordPremiumRecipeUnlock,
   recordRecipeViewHistory,
   saveLocalRecipeRead,
 } from '../services/firestoreService';
@@ -63,8 +71,11 @@ interface RecipeDetailPageProps {
   isFavorite: boolean;
   onToggleFavorite: (recipeId: string) => void;
   onNavigate: (route: PageRoute) => void;
-  onRecipeUnlocked: (unlockedIds: string[]) => void;
+  onRecipeUnlocked?: (unlockedIds: string[]) => void;
+  onFreeRecipeUnlocked?: (freeIds: string[]) => void;
+  onPremiumRecipeUnlocked?: (premiumIds: string[]) => void;
   onHistoryUpdated?: (history: RecipeHistoryEntry[]) => void;
+  onToast?: (msg: string) => void;
   plans: SubscriptionPlan[];
   siteSettings?: SiteSettings;
 }
@@ -124,7 +135,10 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
   onToggleFavorite,
   onNavigate,
   onRecipeUnlocked,
+  onFreeRecipeUnlocked,
+  onPremiumRecipeUnlocked,
   onHistoryUpdated,
+  onToast,
   plans,
   siteSettings,
 }) => {
@@ -135,7 +149,9 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
   const recipeFontScopeClass = `rf-m-${mobileFontKey} rf-pc-${desktopFontKey} rf-size-scope rf-size-m-${mobileFontSizeKey} rf-size-pc-${desktopFontSizeKey}`;
   const [content, setContent] = useState<RecipeContent | null>(null);
   const [locked, setLocked] = useState(false);
-  const [lockReason, setLockReason] = useState<'premium' | 'quota_basic' | 'quota_paid' | null>(null);
+  const [lockReason, setLockReason] = useState<
+    'premium' | 'plan_expired' | 'quota_basic' | 'quota_paid' | null
+  >(null);
   const [loading, setLoading] = useState(false);
   const [checkedIngredients, setCheckedIngredients] = useState<Record<number, boolean>>({});
   const [brokenStepImages, setBrokenStepImages] = useState<Record<number, boolean>>({});
@@ -165,16 +181,68 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
   const [lightboxDirection, setLightboxDirection] = useState<'next' | 'prev' | 'fade'>('fade');
 
   const isAdmin = user?.role === 'admin';
-  const currentQuotaLimit = user
-    ? getRecipeQuotaLimit(user.subscriptionPlan, plans)
-    : 10;
+  const paidActive = isPaidPlanActive(user);
 
-  const effectiveUsedIds = useMemo(
-    () => getEffectiveUsedRecipeIds(user, plans),
+  const freeUnlockedIds = useMemo(
+    () => getUserFreeUnlockedIds(user, allRecipes),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user?.uid, user?.role, user?.subscriptionPlan, user?.unlockedRecipeIds, plans, guestTick]
+    [
+      user?.uid,
+      user?.role,
+      user?.subscriptionPlan,
+      user?.subscriptionStatus,
+      user?.freeUnlockedRecipeIds,
+      user?.unlockedRecipeIds,
+      allRecipes,
+      guestTick,
+    ]
   );
-  const usedQuotaCount = effectiveUsedIds.length;
+
+  const premiumUnlockedIds = useMemo(
+    () => getUserPremiumUnlockedIds(user, allRecipes),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      user?.uid,
+      user?.role,
+      user?.premiumUnlockedRecipeIds,
+      user?.unlockedRecipeIds,
+      allRecipes,
+    ]
+  );
+
+  const premiumQuota = useMemo(
+    () => getUserPremiumQuota(user, plans, allRecipes),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      user?.uid,
+      user?.role,
+      user?.subscriptionPlan,
+      user?.subscriptionStatus,
+      user?.premiumRecipeQuota,
+      user?.premiumUnlockedRecipeIds,
+      plans,
+      allRecipes,
+    ]
+  );
+
+  const remainingNewPremium = useMemo(
+    () => getRemainingNewPremiumSlots(user, plans, allRecipes),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      user?.uid,
+      user?.role,
+      user?.subscriptionPlan,
+      user?.subscriptionStatus,
+      user?.premiumRecipeQuota,
+      user?.premiumUnlockedRecipeIds,
+      plans,
+      allRecipes,
+    ]
+  );
+
+  const isPermanentlyUnlockedPremium = Boolean(
+    recipe?.isPremium && premiumUnlockedIds.includes(recipe.id)
+  );
 
   useEffect(() => {
     if (!recipe) return;
@@ -184,7 +252,10 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
     setCheckedIngredients({});
     setBrokenStepImages({});
 
-    const attachLiveContentListener = (alreadyUnlocked: boolean, currentUsedLen: number, limit: number) => {
+    const attachLiveContentListener = (
+      canReadSeedFallback: boolean,
+      fallbackLockReason: 'premium' | 'plan_expired' | 'quota_basic' | 'quota_paid'
+    ) => {
       const contentRef = doc(db, 'recipes', recipe.id, 'content', 'detail');
       unsubContent = onSnapshot(
         contentRef,
@@ -205,20 +276,14 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
         () => {
           if (!active) return;
           const localSeed = SEED_RECIPES.find((r) => r.recipe.id === recipe.id);
-          if (localSeed && (!recipe.isPremium || hasAccess || isAdmin)) {
+          if (localSeed && canReadSeedFallback) {
             setContent(localSeed.content);
             setLocked(false);
             setLockReason(null);
           } else {
             setContent(null);
             setLocked(true);
-            setLockReason(
-              !alreadyUnlocked && currentUsedLen >= limit
-                ? user && user.subscriptionPlan !== 'basic'
-                  ? 'quota_paid'
-                  : 'quota_basic'
-                : 'premium'
-            );
+            setLockReason(fallbackLockReason);
           }
           setLoading(false);
         }
@@ -239,62 +304,175 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
             if (active) onHistoryUpdated?.(hist);
           });
         }
-        attachLiveContentListener(true, 0, 999);
+        attachLiveContentListener(true, 'premium');
         return;
       }
 
-      // 2. Check premium access
-      if (recipe.isPremium && !hasAccess) {
+      const isPaidCurrentlyActive = isPaidPlanActive(user);
+
+      // 2. PREMIUM RECIPE ACCESS FLOW
+      if (recipe.isPremium) {
+        const currentPremiumIds = getUserPremiumUnlockedIds(user, allRecipes);
+        const totalPremiumQuota = getUserPremiumQuota(user, plans, allRecipes);
+        const alreadyPremiumUnlocked = currentPremiumIds.includes(recipe.id);
+
+        if (alreadyPremiumUnlocked) {
+          // Once unlocked, premium recipe remains accessible FOREVER even after 1-month plan expires
+          const res = await fetchRecipeContent(recipe.id, true, true);
+          if (!active) return;
+          if (res.locked) {
+            setContent(null);
+            setLocked(true);
+            setLockReason('premium');
+            setLoading(false);
+            return;
+          }
+          setContent(res.content);
+          setLocked(false);
+          setLockReason(null);
+          setLoading(false);
+          if (user) {
+            recordRecipeViewHistory(user.uid, user.viewedHistory || [], recipe.id).then((hist) => {
+              if (active) onHistoryUpdated?.(hist);
+            });
+          }
+          attachLiveContentListener(true, 'premium');
+          return;
+        }
+
+        // New premium recipe requires an active non-expired paid plan
+        if (!isPaidCurrentlyActive || !user) {
+          const wasPaidUser = Boolean(
+            user && (user.subscriptionPlan === 'standard' || user.subscriptionPlan === 'pro')
+          );
+          setContent(null);
+          setLocked(true);
+          setLockReason(wasPaidUser ? 'plan_expired' : 'premium');
+          setLoading(false);
+          return;
+        }
+
+        // Check if user's cumulative premium recipe slots are exhausted
+        if (currentPremiumIds.length >= totalPremiumQuota) {
+          setContent(null);
+          setLocked(true);
+          setLockReason('quota_paid');
+          setLoading(false);
+          notifyProLimitReached(user.uid, totalPremiumQuota).then((sent) => {
+            if (sent && active) {
+              onToast?.(
+                'আপনার প্রো প্ল্যানের রেসিপি লিমিট শেষ হয়েছে! আরও নতুন প্রিমিয়াম রেসিপি দেখতে প্ল্যান আপগ্রেড করুন।'
+              );
+            }
+          });
+          return;
+        }
+
+        // Unlock this new premium recipe permanently (deduplicated: repeat views never count again)
+        const updatedPremiumIds = await recordPremiumRecipeUnlock(
+          user.uid,
+          currentPremiumIds,
+          recipe.id,
+          totalPremiumQuota
+        );
+        if (!active) return;
+        onPremiumRecipeUnlocked?.(updatedPremiumIds);
+
+        if (updatedPremiumIds.length >= totalPremiumQuota) {
+          notifyProLimitReached(user.uid, totalPremiumQuota).then((sent) => {
+            if (sent && active) {
+              onToast?.(
+                'এই রেসিপিটি আনলক হওয়ার সাথে আপনার প্রো প্ল্যানের কোটা পূর্ণ হয়েছে। আরও দেখতে প্ল্যান আপগ্রেড করুন।'
+              );
+            }
+          });
+        }
+
+        const res = await fetchRecipeContent(recipe.id, true, true);
+        if (!active) return;
+        if (res.locked) {
+          setContent(null);
+          setLocked(true);
+          setLockReason('quota_paid');
+          setLoading(false);
+          return;
+        }
+
+        setContent(res.content);
+        setLocked(false);
+        setLockReason(null);
+        setLoading(false);
+
+        recordRecipeViewHistory(user.uid, user.viewedHistory || [], recipe.id).then((hist) => {
+          if (active) onHistoryUpdated?.(hist);
+        });
+
+        attachLiveContentListener(true, 'quota_paid');
+        return;
+      }
+
+      // 3. FREE RECIPE ACCESS FLOW (Up to 10 unique free recipes without a paid plan; unlimited with active paid plan)
+      const currentFreeIds = getUserFreeUnlockedIds(user, allRecipes);
+      const alreadyFreeUnlocked = currentFreeIds.includes(recipe.id);
+
+      if (!alreadyFreeUnlocked && !isPaidCurrentlyActive && currentFreeIds.length >= FREE_RECIPE_LIMIT) {
         setContent(null);
         setLocked(true);
-        setLockReason('premium');
+        setLockReason('quota_basic');
         setLoading(false);
-        return;
-      }
-
-      // 3. Enforce strict 1-month recipe quota (Basic: 10, Standard: 10, Pro: 25)
-      const currentUsed = getEffectiveUsedRecipeIds(user, plans);
-      const alreadyUnlocked = currentUsed.includes(recipe.id);
-      const limit = user ? getRecipeQuotaLimit(user.subscriptionPlan, plans) : 10;
-
-      if (!alreadyUnlocked && currentUsed.length >= limit) {
-        setContent(null);
-        setLocked(true);
-        setLockReason(user && user.subscriptionPlan !== 'basic' ? 'quota_paid' : 'quota_basic');
-        setLoading(false);
-        return;
-      }
-
-      // 4. Record unlock BEFORE fetching protected content so Firestore rules & profile quota stay exact
-      if (!alreadyUnlocked) {
         if (user) {
-          const updatedIds = await recordRecipeUnlock(
+          notifyFreeLimitReached(user.uid).then((sent) => {
+            if (sent && active) {
+              onToast?.(
+                'আপনার ১০টি ফ্রি রেসিপির লিমিট শেষ হয়েছে! নতুন রেসিপি দেখতে প্রো প্ল্যান কিনুন।'
+              );
+            }
+          });
+        } else {
+          onToast?.('আপনার ১০টি ফ্রি রেসিপির লিমিট শেষ হয়েছে! নতুন রেসিপি দেখতে প্রো প্ল্যান কিনুন।');
+        }
+        return;
+      }
+
+      if (!alreadyFreeUnlocked) {
+        if (user) {
+          const updatedFreeIds = await recordFreeRecipeUnlock(
             user.uid,
-            currentUsed,
+            currentFreeIds,
             recipe.id,
-            user.subscriptionPlan
+            isPaidCurrentlyActive
           );
           if (!active) return;
-          onRecipeUnlocked(updatedIds);
+          onFreeRecipeUnlocked?.(updatedFreeIds);
+          onRecipeUnlocked?.(updatedFreeIds);
+
+          if (!isPaidCurrentlyActive && updatedFreeIds.length >= FREE_RECIPE_LIMIT) {
+            notifyFreeLimitReached(user.uid).then((sent) => {
+              if (sent && active) {
+                onToast?.(
+                  'আপনার ১০টি ফ্রি রেসিপির লিমিট পূর্ণ হয়েছে। আরও নতুন রেসিপি দেখতে প্রো প্ল্যান কিনুন।'
+                );
+              }
+            });
+          }
         } else {
-          saveLocalRecipeRead(recipe.id, GUEST_READS_KEY, 10);
+          const nextGuestIds = saveLocalRecipeRead(recipe.id, GUEST_READS_KEY, FREE_RECIPE_LIMIT);
           if (active) setGuestTick((t) => t + 1);
+          if (nextGuestIds.length >= FREE_RECIPE_LIMIT) {
+            onToast?.(
+              'আপনার ১০টি ফ্রি রেসিপির লিমিট পূর্ণ হয়েছে। আরও নতুন রেসিপি দেখতে প্রো প্ল্যান কিনুন।'
+            );
+          }
         }
       }
 
-      const res = await fetchRecipeContent(recipe.id, recipe.isPremium, hasAccess || !recipe.isPremium);
+      const res = await fetchRecipeContent(recipe.id, false, true);
       if (!active) return;
 
       if (res.locked) {
         setContent(null);
         setLocked(true);
-        setLockReason(
-          !alreadyUnlocked && currentUsed.length >= limit
-            ? user && user.subscriptionPlan !== 'basic'
-              ? 'quota_paid'
-              : 'quota_basic'
-            : 'premium'
-        );
+        setLockReason('quota_basic');
         setLoading(false);
         return;
       }
@@ -310,7 +488,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
         });
       }
 
-      attachLiveContentListener(alreadyUnlocked, currentUsed.length, limit);
+      attachLiveContentListener(true, 'quota_basic');
     };
 
     evaluateAccessAndFetch().catch(() => {
@@ -325,7 +503,17 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
       active = false;
       if (unsubContent) unsubContent();
     };
-  }, [recipe?.id, recipe?.isPremium, hasAccess, isAdmin, user?.uid, user?.subscriptionPlan, plans]);
+  }, [
+    recipe?.id,
+    recipe?.isPremium,
+    hasAccess,
+    isAdmin,
+    user?.uid,
+    user?.subscriptionPlan,
+    user?.subscriptionStatus,
+    user?.premiumRecipeQuota,
+    plans,
+  ]);
 
   // Real-time comments listener
   useEffect(() => {
@@ -685,19 +873,51 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
           {/* Quota Status Line for Non-Admins */}
           {!isAdmin && (
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-[#F5EFE1]/80 border border-[#E6DEC8] text-xs text-[#4A4136]">
-              <span>
-                সদস্যপদ কোটা:{' '}
-                <strong className="text-[#1B4D24] tabular-nums">
-                  {toBengaliDigits(Math.min(usedQuotaCount, currentQuotaLimit))} / {toBengaliDigits(currentQuotaLimit)}টি রেসিপি
-                </strong>{' '}
-                ব্যবহৃত (১ মাসের প্যাক)
-              </span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                {recipe.isPremium ? (
+                  <>
+                    <span>
+                      প্রিমিয়াম কোটা:{' '}
+                      <strong className="text-[#1B4D24] tabular-nums">
+                        {toBengaliDigits(premiumUnlockedIds.length)} / {toBengaliDigits(premiumQuota)}টি
+                      </strong>{' '}
+                      আনলকড
+                      {paidActive && (
+                        <> (বাকি {toBengaliDigits(remainingNewPremium)}টি)</>
+                      )}
+                    </span>
+                    {isPermanentlyUnlockedPremium && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-[#1B4D24] font-bold">
+                        <CheckCircle2 className="w-3 h-3" />
+                        চিরস্থায়ী আনলকড
+                      </span>
+                    )}
+                  </>
+                ) : paidActive ? (
+                  <span>
+                    সক্রিয় প্ল্যান:{' '}
+                    <strong className="text-[#1B4D24]">ফ্রি রেসিপি আনলিমিটেড</strong> · প্রিমিয়াম বাকি{' '}
+                    <strong className="text-[#B92B27] tabular-nums">
+                      {toBengaliDigits(remainingNewPremium)}টি
+                    </strong>
+                  </span>
+                ) : (
+                  <span>
+                    ফ্রি রেসিপি কোটা:{' '}
+                    <strong className="text-[#1B4D24] tabular-nums">
+                      {toBengaliDigits(Math.min(freeUnlockedIds.length, FREE_RECIPE_LIMIT))} /{' '}
+                      {toBengaliDigits(FREE_RECIPE_LIMIT)}টি রেসিপি
+                    </strong>{' '}
+                    দেখা হয়েছে (একই রেসিপি বারবার দেখলেও ১ বারই গণনা হয়)
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => onNavigate({ page: 'pricing' })}
                 className="font-bold text-[#B92B27] hover:underline cursor-pointer"
               >
-                প্ল্যান দেখুন / আপগ্রেড →
+                {paidActive ? 'কোটা বাড়ান / আপগ্রেড →' : 'প্রো প্ল্যান নিন →'}
               </button>
             </div>
           )}
@@ -708,7 +928,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
             </div>
           )}
 
-          {/* Lock Screen: Premium OR Quota Reached */}
+          {/* Lock Screen: Premium OR Expired Plan OR Free/Pro Quota Reached */}
           {!loading && locked && (
             <div className="rounded-2xl border border-[#D4A017]/50 bg-[#FFFDF6] p-6 sm:p-9 text-center space-y-4">
               <div className="w-12 h-12 mx-auto rounded-full bg-[#E5B83B]/20 text-[#9A6E04] flex items-center justify-center">
@@ -716,17 +936,21 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
               </div>
               <h2 className="font-display-bn text-xl sm:text-2xl font-bold text-[#1F1A14]">
                 {lockReason === 'quota_basic'
-                  ? 'আপনার ফ্রি ১০টি রেসিপির সীমা পূর্ণ হয়েছে'
+                  ? 'আপনার ১০টি ফ্রি রেসিপির লিমিট শেষ হয়েছে'
                   : lockReason === 'quota_paid'
-                    ? 'আপনার এই মাসের রেসিপি কোটা পূর্ণ হয়েছে'
-                    : 'এটি একটি প্রিমিয়াম রেসিপি'}
+                    ? 'আপনার প্রো প্ল্যানের প্রিমিয়াম রেসিপি লিমিট পূর্ণ হয়েছে'
+                    : lockReason === 'plan_expired'
+                      ? 'আপনার ১ মাসের প্ল্যানের মেয়াদ শেষ হয়েছে'
+                      : 'এটি একটি প্রিমিয়াম রেসিপি'}
               </h2>
               <p className="text-sm text-[#5A5044] max-w-md mx-auto leading-relaxed">
                 {lockReason === 'quota_basic'
-                  ? 'বেসিক প্ল্যানে ১০টি রেসিপি ফ্রিতে শেখা যায়। নতুন রেসিপি ওপেন করতে ১ মাসের স্ট্যান্ডার্ড (১০০ টাকা — ১০টি রেসিপি) অথবা প্রো অফার (২০০ টাকা — ২৫টি রেসিপি) প্ল্যান নিন।'
+                  ? 'ফ্রি ইউজাররা সর্বোচ্চ ১০টি ফ্রি রেসিপি বিনামূল্যে দেখতে পারবেন। ১০টির বেশি নতুন রেসিপি দেখতে অনুগ্রহ করে ১ মাসের স্ট্যান্ডার্ড বা প্রো প্ল্যান কিনুন।'
                   : lockReason === 'quota_paid'
-                    ? 'আপনার বর্তমান ১ মাসের প্যাকেজের সব রেসিপি ব্যবহার হয়ে গেছে। আরও ২৫টি রেসিপি শিখতে প্রো অফার প্যাকেজ (২০০ টাকা/মাস) বা নতুন প্যাকেজ অ্যাক্টিভেট করুন।'
-                    : 'প্রতি প্রিমিয়াম রেসিপি মাত্র ১০ টাকা হিসেবে ছবিসহ ধাপে ধাপে রান্নার নির্দেশনা আনলক করতে স্ট্যান্ডার্ড বা প্রো সাবস্ক্রিপশন নিন।'}
+                    ? 'আপনার কেনা প্ল্যানের নির্ধারিত সব প্রিমিয়াম রেসিপি দেখা হয়ে গেছে। আরও নতুন প্রিমিয়াম রেসিপি আনলক করতে একাধিকবার প্ল্যান আপগ্রেড করতে পারবেন। আগে দেখা প্রিমিয়াম রেসিপিগুলো আপনার প্রোফাইলে সবসময় আনলক থাকবে!'
+                    : lockReason === 'plan_expired'
+                      ? 'আপনার ১ মাসের প্ল্যানের মেয়াদ শেষ হয়ে গেছে। নতুন প্রিমিয়াম রেসিপি আনলক করতে প্ল্যান রিনিউ করুন। তবে আগে দেখা প্রিমিয়াম রেসিপিগুলো সবসময় আনলক থাকবে।'
+                      : 'এই প্রিমিয়াম রেসিপিটি আনলক করতে স্ট্যান্ডার্ড বা প্রো প্ল্যান নিন। একবার যে প্রিমিয়াম রেসিপি দেখবেন সেটি ১ মাসের মেয়াদ শেষ হলেও আপনার জন্য সবসময় আনলক থাকবে!'}
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 max-w-lg mx-auto">
@@ -743,9 +967,15 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
                   >
                     <p className="text-base font-bold">{plan.name} প্ল্যান (১ মাস)</p>
                     <p className="text-xs opacity-90 mt-0.5 tabular-nums">
-                      {plan.priceLabel} · {toBengaliDigits(plan.recipeLimit || (plan.tier === 'pro' ? 25 : 10))}টি রেসিপি
+                      {plan.priceLabel} · {toBengaliDigits(plan.recipeLimit || (plan.tier === 'pro' ? 25 : 10))}টি প্রিমিয়াম রেসিপি
                     </p>
-                    <p className="text-xs font-bold underline mt-2">সাবস্ক্রাইব করুন →</p>
+                    <p className="text-xs font-bold underline mt-2">
+                      {lockReason === 'plan_expired'
+                        ? 'প্ল্যান রিনিউ করুন →'
+                        : lockReason === 'quota_paid'
+                          ? 'প্ল্যান আপগ্রেড করুন →'
+                          : 'প্ল্যান কিনুন →'}
+                    </p>
                   </button>
                 ))}
               </div>

@@ -18,6 +18,10 @@ interface CategoryPageProps {
   hasActiveSubscription: boolean;
   unlockedIds?: string[];
   quotaLimit?: number;
+  freeUnlockedIds?: string[];
+  premiumUnlockedIds?: string[];
+  premiumQuotaLimit?: number;
+  freeQuotaLimit?: number;
   currentPage: number;
   onPageChange: (page: number) => void;
 }
@@ -41,6 +45,10 @@ export const CategoryPage: React.FC<CategoryPageProps> = ({
   hasActiveSubscription,
   unlockedIds,
   quotaLimit,
+  freeUnlockedIds,
+  premiumUnlockedIds,
+  premiumQuotaLimit,
+  freeQuotaLimit,
   currentPage,
   onPageChange,
 }) => {
@@ -163,6 +171,10 @@ export const CategoryPage: React.FC<CategoryPageProps> = ({
         hasActiveSubscription={hasActiveSubscription}
         unlockedIds={unlockedIds}
         quotaLimit={quotaLimit}
+        freeUnlockedIds={freeUnlockedIds}
+        premiumUnlockedIds={premiumUnlockedIds}
+        premiumQuotaLimit={premiumQuotaLimit}
+        freeQuotaLimit={freeQuotaLimit}
         title={`${categoryName} — রেসিপি তালিকা`}
         hideSearchAndFilters
         hideCategoryStrip

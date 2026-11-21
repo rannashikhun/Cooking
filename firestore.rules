@@ -41,17 +41,29 @@ service cloud.firestore {
       );
     }
 
-    function hasActiveSubscription(userId) {
-      return exists(/databases/$(database)/documents/users/$(userId)) &&
-        get(/databases/$(database)/documents/users/$(userId)).data.subscriptionStatus == 'active' &&
-        get(/databases/$(database)/documents/users/$(userId)).data.subscriptionPlan in ['standard', 'pro'];
+    function hasActivePaidSubData(u) {
+      return u.subscriptionStatus == 'active' &&
+        u.subscriptionPlan in ['standard', 'pro'] &&
+        (!('subscriptionExpiresAt' in u) || u.subscriptionExpiresAt > request.time);
     }
 
-    function userWithinQuota(u, recipeId) {
-      return !('unlockedRecipeIds' in u) ||
-        recipeId in u.unlockedRecipeIds ||
-        (u.subscriptionPlan == 'pro' && u.unlockedRecipeIds.size() < 25) ||
-        (u.subscriptionPlan in ['basic', 'standard'] && u.unlockedRecipeIds.size() < 10);
+    function effectivePremiumQuota(u) {
+      return ('premiumRecipeQuota' in u && u.premiumRecipeQuota is int && u.premiumRecipeQuota > 0)
+        ? u.premiumRecipeQuota
+        : (u.subscriptionPlan == 'pro' ? 25 : (u.subscriptionPlan == 'standard' ? 10 : 0));
+    }
+
+    function isPermanentlyUnlockedPremium(u, recipeId) {
+      return ('premiumUnlockedRecipeIds' in u && recipeId in u.premiumUnlockedRecipeIds) ||
+        ('unlockedRecipeIds' in u && recipeId in u.unlockedRecipeIds);
+    }
+
+    function freeRecipeAccessAllowed(u, recipeId) {
+      return hasActivePaidSubData(u) ||
+        ('freeUnlockedRecipeIds' in u && recipeId in u.freeUnlockedRecipeIds) ||
+        ('unlockedRecipeIds' in u && recipeId in u.unlockedRecipeIds) ||
+        !('freeUnlockedRecipeIds' in u) ||
+        u.freeUnlockedRecipeIds.size() < 10;
     }
 
     // Entity validation helpers
@@ -162,7 +174,8 @@ service cloud.firestore {
         data.keys().hasOnly([
           'uid', 'displayName', 'email', 'phoneNumber', 'photoURL', 'role', 'subscriptionPlan',
           'subscriptionStatus', 'subscriptionExpiresAt', 'lastOrderId',
-          'favoriteRecipeIds', 'unlockedRecipeIds', 'viewedHistory', 'createdAt', 'updatedAt'
+          'favoriteRecipeIds', 'unlockedRecipeIds', 'freeUnlockedRecipeIds',
+          'premiumUnlockedRecipeIds', 'premiumRecipeQuota', 'viewedHistory', 'createdAt', 'updatedAt'
         ]) &&
         isValidId(data.uid) &&
         data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
@@ -177,9 +190,18 @@ service cloud.firestore {
         data.favoriteRecipeIds is list && data.favoriteRecipeIds.size() <= 100 &&
         (data.favoriteRecipeIds.size() == 0 || data.favoriteRecipeIds[0] is string) &&
         (!('unlockedRecipeIds' in data) || (
-          data.unlockedRecipeIds is list && data.unlockedRecipeIds.size() <= 100 &&
+          data.unlockedRecipeIds is list && data.unlockedRecipeIds.size() <= 500 &&
           (data.unlockedRecipeIds.size() == 0 || data.unlockedRecipeIds[0] is string)
         )) &&
+        (!('freeUnlockedRecipeIds' in data) || (
+          data.freeUnlockedRecipeIds is list && data.freeUnlockedRecipeIds.size() <= 200 &&
+          (data.freeUnlockedRecipeIds.size() == 0 || data.freeUnlockedRecipeIds[0] is string)
+        )) &&
+        (!('premiumUnlockedRecipeIds' in data) || (
+          data.premiumUnlockedRecipeIds is list && data.premiumUnlockedRecipeIds.size() <= 500 &&
+          (data.premiumUnlockedRecipeIds.size() == 0 || data.premiumUnlockedRecipeIds[0] is string)
+        )) &&
+        (!('premiumRecipeQuota' in data) || (data.premiumRecipeQuota is int && data.premiumRecipeQuota >= 0 && data.premiumRecipeQuota <= 500)) &&
         (!('viewedHistory' in data) || (
           data.viewedHistory is list && data.viewedHistory.size() <= 50 &&
           (data.viewedHistory.size() == 0 || (
@@ -202,7 +224,10 @@ service cloud.firestore {
           'type', 'title', 'message', 'recipeId', 'orderId',
           'senderUid', 'senderName', 'isRead', 'createdAt'
         ]) &&
-        data.type in ['comment_reply', 'payment_approved', 'payment_rejected', 'payment_pending'] &&
+        data.type in [
+          'comment_reply', 'payment_approved', 'payment_rejected', 'payment_pending',
+          'free_limit_reached', 'pro_limit_reached', 'plan_expiry_reminder'
+        ] &&
         data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
         data.message is string && data.message.size() >= 1 && data.message.size() <= 400 &&
         (!('recipeId' in data) || (data.recipeId is string && data.recipeId.size() >= 1 && data.recipeId.size() <= 128)) &&
@@ -221,7 +246,7 @@ service cloud.firestore {
         ]) &&
         data.keys().hasOnly([
           'userId', 'userEmail', 'userName', 'planId', 'planName',
-          'planTier', 'durationDays', 'amount', 'paymentMethod', 'senderNumber',
+          'planTier', 'durationDays', 'recipeLimit', 'amount', 'paymentMethod', 'senderNumber',
           'transactionId', 'status', 'createdAt'
         ]) &&
         isValidId(data.userId) &&
@@ -231,6 +256,7 @@ service cloud.firestore {
         data.planName is string && data.planName.size() <= 80 &&
         data.planTier in ['basic', 'standard', 'pro'] &&
         data.durationDays is int && data.durationDays >= 1 &&
+        (!('recipeLimit' in data) || (data.recipeLimit is int && data.recipeLimit >= 1 && data.recipeLimit <= 1000)) &&
         data.amount is int && data.amount >= 0 &&
         data.paymentMethod in ['বিকাশ', 'নগদ', 'রকেট', 'ব্যাংক', 'ফ্রি'] &&
         data.senderNumber is string && data.senderNumber.size() <= 40 &&
@@ -276,6 +302,7 @@ service cloud.firestore {
           'recipeFontDesktop', 'recipeFontMobile',
           'recipeFontSizeDesktop', 'recipeFontSizeMobile',
           'adminFontFamily', 'adminFontSize',
+          'profileFontFamily', 'profileFontSize',
           'seoTitle', 'seoDescription', 'seoKeywords', 'seoAuthor',
           'canonicalBaseUrl', 'seoRobotsPolicy',
           'googleSiteVerification', 'googleVerificationFile',
@@ -297,6 +324,8 @@ service cloud.firestore {
         (!('recipeFontSizeMobile' in data) || (data.recipeFontSizeMobile is string && data.recipeFontSizeMobile in ['sm', 'md', 'lg', 'xl'])) &&
         (!('adminFontFamily' in data) || (data.adminFontFamily is string && data.adminFontFamily in ['bensen', 'atma', 'tiro-italic', 'noto-serif', 'tiro', 'hind-siliguri', 'noto-sans'])) &&
         (!('adminFontSize' in data) || (data.adminFontSize is string && data.adminFontSize in ['sm', 'md', 'lg', 'xl'])) &&
+        (!('profileFontFamily' in data) || (data.profileFontFamily is string && data.profileFontFamily in ['bensen', 'atma', 'tiro-italic', 'noto-serif', 'tiro', 'hind-siliguri', 'noto-sans'])) &&
+        (!('profileFontSize' in data) || (data.profileFontSize is string && data.profileFontSize in ['sm', 'md', 'lg', 'xl'])) &&
         (!('seoTitle' in data) || (data.seoTitle is string && data.seoTitle.size() <= 120)) &&
         (!('seoDescription' in data) || (data.seoDescription is string && data.seoDescription.size() <= 320)) &&
         (!('seoKeywords' in data) || (data.seoKeywords is string && data.seoKeywords.size() <= 500)) &&
@@ -358,13 +387,22 @@ service cloud.firestore {
             get(/databases/$(database)/documents/recipes/$(recipeId)).data.isPremium == false && (
               !isSignedIn() ||
               !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
-              userWithinQuota(get(/databases/$(database)/documents/users/$(request.auth.uid)).data, recipeId)
+              freeRecipeAccessAllowed(get(/databases/$(database)/documents/users/$(request.auth.uid)).data, recipeId)
             )
           ) ||
           (
+            get(/databases/$(database)/documents/recipes/$(recipeId)).data.isPremium == true &&
             isSignedIn() &&
-            hasActiveSubscription(request.auth.uid) &&
-            userWithinQuota(get(/databases/$(database)/documents/users/$(request.auth.uid)).data, recipeId)
+            exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+              isPermanentlyUnlockedPremium(get(/databases/$(database)/documents/users/$(request.auth.uid)).data, recipeId) ||
+              (
+                hasActivePaidSubData(get(/databases/$(database)/documents/users/$(request.auth.uid)).data) &&
+                (
+                  !('premiumUnlockedRecipeIds' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) ||
+                  get(/databases/$(database)/documents/users/$(request.auth.uid)).data.premiumUnlockedRecipeIds.size() < effectivePremiumQuota(get(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+                )
+              )
+            )
           )
         );
         allow create, update: if isValidId(recipeId) && isAdmin() && isValidRecipeContent(incoming()) &&
@@ -427,15 +465,28 @@ service cloud.firestore {
           (
             isOwner(userId) &&
             incoming().role == existing().role &&
-            incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'phoneNumber', 'favoriteRecipeIds', 'unlockedRecipeIds', 'viewedHistory', 'updatedAt']) &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'displayName', 'photoURL', 'phoneNumber', 'favoriteRecipeIds',
+              'unlockedRecipeIds', 'freeUnlockedRecipeIds', 'premiumUnlockedRecipeIds',
+              'viewedHistory', 'updatedAt'
+            ]) &&
             incoming().subscriptionPlan == existing().subscriptionPlan &&
             incoming().subscriptionStatus == existing().subscriptionStatus &&
-            (!('unlockedRecipeIds' in incoming()) || (
-              (!('unlockedRecipeIds' in existing()) || incoming().unlockedRecipeIds.hasAll(existing().unlockedRecipeIds)) &&
+            (!('freeUnlockedRecipeIds' in incoming().diff(existing()).affectedKeys()) || (
+              (!('freeUnlockedRecipeIds' in existing()) || incoming().freeUnlockedRecipeIds.hasAll(existing().freeUnlockedRecipeIds)) &&
               (
-                (existing().subscriptionPlan == 'pro' && incoming().unlockedRecipeIds.size() <= 25) ||
-                (existing().subscriptionPlan in ['basic', 'standard'] && incoming().unlockedRecipeIds.size() <= 10)
+                (hasActivePaidSubData(existing()) && incoming().freeUnlockedRecipeIds.size() <= 200) ||
+                incoming().freeUnlockedRecipeIds.size() <= 10
               )
+            )) &&
+            (!('premiumUnlockedRecipeIds' in incoming().diff(existing()).affectedKeys()) || (
+              hasActivePaidSubData(existing()) &&
+              (!('premiumUnlockedRecipeIds' in existing()) || incoming().premiumUnlockedRecipeIds.hasAll(existing().premiumUnlockedRecipeIds)) &&
+              incoming().premiumUnlockedRecipeIds.size() <= effectivePremiumQuota(existing())
+            )) &&
+            (!('unlockedRecipeIds' in incoming().diff(existing()).affectedKeys()) || (
+              (!('unlockedRecipeIds' in existing()) || incoming().unlockedRecipeIds.hasAll(existing().unlockedRecipeIds)) &&
+              incoming().unlockedRecipeIds.size() <= 500
             ))
           ) ||
           (
@@ -462,7 +513,10 @@ service cloud.firestore {
           incoming().createdAt == request.time &&
           incoming().isRead == false && (
             isAdmin() ||
-            (incoming().type == 'payment_pending' && isOwner(userId)) ||
+            (
+              incoming().type in ['payment_pending', 'free_limit_reached', 'pro_limit_reached', 'plan_expiry_reminder'] &&
+              isOwner(userId)
+            ) ||
             (
               incoming().type == 'comment_reply' &&
               'senderUid' in incoming() &&

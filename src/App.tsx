@@ -32,10 +32,16 @@ import {
 } from './data/seedData';
 import { auth, db, testFirestoreConnection } from './firebase';
 import {
+  FREE_RECIPE_LIMIT,
+  checkAndNotifyPlanExpiry,
   clearUserLocalReads,
   fetchLiveCatalogFromServer,
   getEffectiveUsedRecipeIds,
   getRecipeQuotaLimit,
+  getUserFreeUnlockedIds,
+  getUserPremiumQuota,
+  getUserPremiumUnlockedIds,
+  isPaidPlanActive,
   isSuperAdminEmail,
   markAllNotificationsRead,
   markNotificationRead,
@@ -422,6 +428,16 @@ export default function App() {
                   uid: fbUser.uid,
                   favoriteRecipeIds: Array.isArray(data.favoriteRecipeIds) ? data.favoriteRecipeIds : [],
                   unlockedRecipeIds: Array.isArray(data.unlockedRecipeIds) ? data.unlockedRecipeIds : [],
+                  freeUnlockedRecipeIds: Array.isArray(data.freeUnlockedRecipeIds)
+                    ? data.freeUnlockedRecipeIds
+                    : prev?.freeUnlockedRecipeIds || [],
+                  premiumUnlockedRecipeIds: Array.isArray(data.premiumUnlockedRecipeIds)
+                    ? data.premiumUnlockedRecipeIds
+                    : prev?.premiumUnlockedRecipeIds || [],
+                  premiumRecipeQuota:
+                    typeof data.premiumRecipeQuota === 'number'
+                      ? data.premiumRecipeQuota
+                      : prev?.premiumRecipeQuota || 0,
                   viewedHistory: Array.isArray(data.viewedHistory)
                     ? data.viewedHistory
                     : prev?.viewedHistory || [],
@@ -564,26 +580,47 @@ export default function App() {
     };
   }, [checkDeployedBuildUpdate, showToast, syncCatalogFromServer]);
 
-  const isSubscriptionNotExpired =
-    !user?.subscriptionExpiresAt ||
-    typeof (user.subscriptionExpiresAt as { toMillis?: () => number }).toMillis !== 'function' ||
-    (user.subscriptionExpiresAt as { toMillis: () => number }).toMillis() > Date.now();
+  // 3. Automatic 1-day-before-expiry renewal notification for Pro/Standard users
+  useEffect(() => {
+    if (!user || user.role === 'admin') return;
+    let active = true;
 
-  const hasActivePremiumAccess = Boolean(
-    user &&
-      (user.role === 'admin' ||
-        (user.subscriptionStatus === 'active' &&
-          isSubscriptionNotExpired &&
-          (user.subscriptionPlan === 'standard' || user.subscriptionPlan === 'pro')))
-  );
+    const runExpiryCheck = () => {
+      checkAndNotifyPlanExpiry(user).then((res) => {
+        if (active && res.notified && res.message) {
+          showToast(res.message);
+        }
+      });
+    };
+
+    runExpiryCheck();
+    const handleFocusOrVisible = () => {
+      if (document.visibilityState === 'visible') {
+        runExpiryCheck();
+      }
+    };
+    document.addEventListener('visibilitychange', handleFocusOrVisible);
+    window.addEventListener('focus', runExpiryCheck);
+    return () => {
+      active = false;
+      document.removeEventListener('visibilitychange', handleFocusOrVisible);
+      window.removeEventListener('focus', runExpiryCheck);
+    };
+  }, [user, showToast]);
+
+  const hasActivePremiumAccess = isPaidPlanActive(user);
 
   const isAdminUser = user?.role === 'admin';
-  const effectiveUnlockedIds = isAdminUser ? undefined : getEffectiveUsedRecipeIds(user, plans);
+  const effectiveUnlockedIds = isAdminUser ? undefined : getEffectiveUsedRecipeIds(user, plans, recipes);
   const effectiveQuotaLimit = isAdminUser
     ? undefined
     : user
       ? getRecipeQuotaLimit(user.subscriptionPlan, plans)
-      : 10;
+      : FREE_RECIPE_LIMIT;
+
+  const freeUnlockedIds = isAdminUser ? undefined : getUserFreeUnlockedIds(user, recipes);
+  const premiumUnlockedIds = isAdminUser ? undefined : getUserPremiumUnlockedIds(user, recipes);
+  const premiumQuotaLimit = isAdminUser ? undefined : getUserPremiumQuota(user, plans, recipes);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -608,7 +645,12 @@ export default function App() {
     }
     if (notif.recipeId) {
       navigate({ page: 'recipe-detail', id: notif.recipeId });
-    } else if (notif.type === 'payment_rejected') {
+    } else if (
+      notif.type === 'payment_rejected' ||
+      notif.type === 'free_limit_reached' ||
+      notif.type === 'pro_limit_reached' ||
+      notif.type === 'plan_expiry_reminder'
+    ) {
       navigate({ page: 'pricing' });
     } else {
       navigate({ page: 'profile' });
@@ -700,6 +742,10 @@ export default function App() {
                 hasActiveSubscription={hasActivePremiumAccess}
                 unlockedIds={effectiveUnlockedIds}
                 quotaLimit={effectiveQuotaLimit}
+                freeUnlockedIds={freeUnlockedIds}
+                premiumUnlockedIds={premiumUnlockedIds}
+                premiumQuotaLimit={premiumQuotaLimit}
+                freeQuotaLimit={FREE_RECIPE_LIMIT}
                 pageSize={10}
                 currentPage={1}
                 hidePagination
@@ -744,6 +790,10 @@ export default function App() {
                 hasActiveSubscription={hasActivePremiumAccess}
                 unlockedIds={effectiveUnlockedIds}
                 quotaLimit={effectiveQuotaLimit}
+                freeUnlockedIds={freeUnlockedIds}
+                premiumUnlockedIds={premiumUnlockedIds}
+                premiumQuotaLimit={premiumQuotaLimit}
+                freeQuotaLimit={FREE_RECIPE_LIMIT}
                 title="নতুন ও বাছাইকৃত রেসিপি"
                 hideSearchAndFilters
                 centerHeading
@@ -792,6 +842,10 @@ export default function App() {
             hasActiveSubscription={hasActivePremiumAccess}
             unlockedIds={effectiveUnlockedIds}
             quotaLimit={effectiveQuotaLimit}
+            freeUnlockedIds={freeUnlockedIds}
+            premiumUnlockedIds={premiumUnlockedIds}
+            premiumQuotaLimit={premiumQuotaLimit}
+            freeQuotaLimit={FREE_RECIPE_LIMIT}
             title="সকল রেসিপি সংগ্রহ"
             hideSearchAndFilters
             centerHeading
@@ -818,6 +872,10 @@ export default function App() {
             hasActiveSubscription={hasActivePremiumAccess}
             unlockedIds={effectiveUnlockedIds}
             quotaLimit={effectiveQuotaLimit}
+            freeUnlockedIds={freeUnlockedIds}
+            premiumUnlockedIds={premiumUnlockedIds}
+            premiumQuotaLimit={premiumQuotaLimit}
+            freeQuotaLimit={FREE_RECIPE_LIMIT}
             currentPage={categoryPageNum}
             onPageChange={setCategoryPageNum}
           />
@@ -843,6 +901,26 @@ export default function App() {
                   : prev
               )
             }
+            onFreeRecipeUnlocked={(freeIds) =>
+              setUser((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      freeUnlockedRecipeIds: freeIds,
+                    }
+                  : prev
+              )
+            }
+            onPremiumRecipeUnlocked={(premiumIds) =>
+              setUser((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      premiumUnlockedRecipeIds: premiumIds,
+                    }
+                  : prev
+              )
+            }
             onHistoryUpdated={(history) => {
               setUser((prev) =>
                 prev
@@ -854,6 +932,7 @@ export default function App() {
               );
               setInterestVersion((v) => v + 1);
             }}
+            onToast={showToast}
             plans={plans}
             siteSettings={siteSettings}
           />
@@ -947,6 +1026,10 @@ export default function App() {
                 hasActiveSubscription={hasActivePremiumAccess}
                 unlockedIds={effectiveUnlockedIds}
                 quotaLimit={effectiveQuotaLimit}
+                freeUnlockedIds={freeUnlockedIds}
+                premiumUnlockedIds={premiumUnlockedIds}
+                premiumQuotaLimit={premiumQuotaLimit}
+                freeQuotaLimit={FREE_RECIPE_LIMIT}
                 title="সংরক্ষিত রেসিপি"
               />
             )}
@@ -978,6 +1061,7 @@ export default function App() {
               user={user}
               recipes={recipes}
               plans={plans}
+              siteSettings={siteSettings}
               notifications={notifications}
               onNotificationClick={handleNotificationClick}
               onMarkAllNotificationsRead={handleMarkAllNotificationsRead}

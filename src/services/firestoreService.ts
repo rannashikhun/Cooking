@@ -37,12 +37,36 @@ import type {
 } from '../types';
 
 export const SUPER_ADMIN_EMAIL = 'rannashikhun@gmail.com';
+export const FREE_RECIPE_LIMIT = 10;
 export const GUEST_READS_KEY = 'rs_guest_free_recipes';
 export const getUserLocalReadsKey = (uid: string) => `rs_user_reads_${uid}`;
+export const getUserFreeLocalReadsKey = (uid: string) => `rs_user_free_reads_${uid}`;
+export const getUserPremiumLocalReadsKey = (uid: string) => `rs_user_premium_reads_${uid}`;
 export const getUserHistoryKey = (uid: string) => `rs_recipe_history_${uid}`;
 
 export function isSuperAdminEmail(email?: string | null): boolean {
   return Boolean(email && email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
+}
+
+export function getSubscriptionExpiresMillis(ts: unknown): number | null {
+  if (typeof ts === 'number' && Number.isFinite(ts)) return ts;
+  if (ts instanceof Timestamp) return ts.toMillis();
+  if (ts && typeof (ts as { toMillis?: () => number }).toMillis === 'function') {
+    return (ts as { toMillis: () => number }).toMillis();
+  }
+  if (ts && typeof (ts as { seconds?: number }).seconds === 'number') {
+    return (ts as { seconds: number }).seconds * 1000;
+  }
+  return null;
+}
+
+export function isPaidPlanActive(user: UserProfile | null): boolean {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  if (user.subscriptionStatus !== 'active') return false;
+  if (user.subscriptionPlan !== 'standard' && user.subscriptionPlan !== 'pro') return false;
+  const expMs = getSubscriptionExpiresMillis(user.subscriptionExpiresAt);
+  return expMs === null || expMs > Date.now();
 }
 
 export function getLocalRecipeReads(key = GUEST_READS_KEY): string[] {
@@ -200,9 +224,9 @@ export function recordCategoryInterestClick(
   }
 }
 
-export function getEffectiveUsedRecipeIds(
+export function getUserFreeUnlockedIds(
   user: UserProfile | null,
-  _plans: SubscriptionPlan[] = []
+  allRecipes: Recipe[] = []
 ): string[] {
   if (!user) {
     return getLocalRecipeReads(GUEST_READS_KEY);
@@ -210,13 +234,103 @@ export function getEffectiveUsedRecipeIds(
   if (user.role === 'admin') {
     return [];
   }
-  const serverIds = Array.isArray(user.unlockedRecipeIds) ? user.unlockedRecipeIds : [];
-  const userLocalIds = getLocalRecipeReads(getUserLocalReadsKey(user.uid));
-  if (user.subscriptionPlan === 'basic') {
-    const guestIds = getLocalRecipeReads(GUEST_READS_KEY);
-    return Array.from(new Set([...serverIds, ...userLocalIds, ...guestIds]));
+  const recipeMap = new Map<string, Recipe>();
+  for (const r of allRecipes) {
+    recipeMap.set(r.id, r);
   }
-  return Array.from(new Set([...serverIds, ...userLocalIds]));
+
+  const serverFreeIds = Array.isArray(user.freeUnlockedRecipeIds) ? user.freeUnlockedRecipeIds : [];
+  const legacyIds = Array.isArray(user.unlockedRecipeIds) ? user.unlockedRecipeIds : [];
+  const legacyFreeIds = legacyIds.filter((id) => {
+    const rec = recipeMap.get(id);
+    if (rec) return !rec.isPremium;
+    return user.subscriptionPlan === 'basic';
+  });
+
+  const userLocalFreeIds = getLocalRecipeReads(getUserFreeLocalReadsKey(user.uid));
+  const paidActive = isPaidPlanActive(user);
+
+  if (!paidActive) {
+    const guestIds = getLocalRecipeReads(GUEST_READS_KEY);
+    return Array.from(new Set([...serverFreeIds, ...legacyFreeIds, ...userLocalFreeIds, ...guestIds]));
+  }
+  return Array.from(new Set([...serverFreeIds, ...legacyFreeIds, ...userLocalFreeIds]));
+}
+
+export function getUserPremiumUnlockedIds(
+  user: UserProfile | null,
+  allRecipes: Recipe[] = []
+): string[] {
+  if (!user || user.role === 'admin') {
+    return [];
+  }
+  const recipeMap = new Map<string, Recipe>();
+  for (const r of allRecipes) {
+    recipeMap.set(r.id, r);
+  }
+
+  const serverPremiumIds = Array.isArray(user.premiumUnlockedRecipeIds)
+    ? user.premiumUnlockedRecipeIds
+    : [];
+  const legacyIds = Array.isArray(user.unlockedRecipeIds) ? user.unlockedRecipeIds : [];
+  const legacyPremiumIds = legacyIds.filter((id) => recipeMap.get(id)?.isPremium === true);
+  const localPremiumIds = getLocalRecipeReads(getUserPremiumLocalReadsKey(user.uid));
+
+  return Array.from(new Set([...serverPremiumIds, ...legacyPremiumIds, ...localPremiumIds]));
+}
+
+export function getUserPremiumQuota(
+  user: UserProfile | null,
+  plans: SubscriptionPlan[] = [],
+  allRecipes: Recipe[] = []
+): number {
+  if (!user) return 0;
+  if (user.role === 'admin') return 9999;
+
+  const unlockedCount = getUserPremiumUnlockedIds(user, allRecipes).length;
+  const storedQuota =
+    typeof user.premiumRecipeQuota === 'number' && user.premiumRecipeQuota > 0
+      ? user.premiumRecipeQuota
+      : 0;
+
+  if (isPaidPlanActive(user)) {
+    if (storedQuota > 0) {
+      return Math.max(storedQuota, unlockedCount);
+    }
+    return Math.max(getRecipeQuotaLimit(user.subscriptionPlan, plans), unlockedCount);
+  }
+
+  return Math.max(storedQuota, unlockedCount);
+}
+
+export function getRemainingNewPremiumSlots(
+  user: UserProfile | null,
+  plans: SubscriptionPlan[] = [],
+  allRecipes: Recipe[] = []
+): number {
+  if (!user) return 0;
+  if (user.role === 'admin') return 9999;
+  if (!isPaidPlanActive(user)) return 0;
+  const totalQuota = getUserPremiumQuota(user, plans, allRecipes);
+  const used = getUserPremiumUnlockedIds(user, allRecipes).length;
+  return Math.max(0, totalQuota - used);
+}
+
+export function getEffectiveUsedRecipeIds(
+  user: UserProfile | null,
+  _plans: SubscriptionPlan[] = [],
+  allRecipes: Recipe[] = []
+): string[] {
+  if (!user) {
+    return getLocalRecipeReads(GUEST_READS_KEY);
+  }
+  if (user.role === 'admin') {
+    return [];
+  }
+  if (isPaidPlanActive(user)) {
+    return getUserPremiumUnlockedIds(user, allRecipes);
+  }
+  return getUserFreeUnlockedIds(user, allRecipes);
 }
 
 export const PHONE_EMAIL_DOMAIN = '@phone.rannashikhun.app';
@@ -322,6 +436,9 @@ export async function syncUserProfile(
       subscriptionStatus: 'active',
       favoriteRecipeIds: [],
       unlockedRecipeIds: carriedGuestReads,
+      freeUnlockedRecipeIds: carriedGuestReads,
+      premiumUnlockedRecipeIds: [],
+      premiumRecipeQuota: 0,
       viewedHistory: [],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -334,8 +451,8 @@ export async function syncUserProfile(
     }
 
     if (!isVerifiedSuperAdmin) {
-      syncLocalRecipeReadsList(carriedGuestReads, getUserLocalReadsKey(firebaseUser.uid), 10);
-      syncLocalRecipeReadsList(carriedGuestReads, GUEST_READS_KEY, 10);
+      syncLocalRecipeReadsList(carriedGuestReads, getUserFreeLocalReadsKey(firebaseUser.uid), FREE_RECIPE_LIMIT);
+      syncLocalRecipeReadsList(carriedGuestReads, GUEST_READS_KEY, FREE_RECIPE_LIMIT);
     }
 
     try {
@@ -355,6 +472,9 @@ export async function syncUserProfile(
       subscriptionStatus: 'active',
       favoriteRecipeIds: [],
       unlockedRecipeIds: carriedGuestReads,
+      freeUnlockedRecipeIds: carriedGuestReads,
+      premiumUnlockedRecipeIds: [],
+      premiumRecipeQuota: 0,
       viewedHistory: [],
     };
   }
@@ -391,32 +511,57 @@ export async function syncUserProfile(
       ? 'admin'
       : 'member';
 
-  const existingUnlocked = Array.isArray(data.unlockedRecipeIds) ? data.unlockedRecipeIds : [];
-  let syncedUnlocked = existingUnlocked;
+  const existingFreeUnlocked = Array.isArray(data.freeUnlockedRecipeIds)
+    ? data.freeUnlockedRecipeIds
+    : data.subscriptionPlan === 'basic' && Array.isArray(data.unlockedRecipeIds)
+      ? data.unlockedRecipeIds
+      : [];
+  const existingPremiumUnlocked = Array.isArray(data.premiumUnlockedRecipeIds)
+    ? data.premiumUnlockedRecipeIds
+    : [];
+  let syncedFreeUnlocked = existingFreeUnlocked;
 
-  if (effectiveRole !== 'admin' && data.subscriptionPlan === 'basic') {
-    const mergedBasic = Array.from(
+  const paidActiveNow =
+    effectiveRole !== 'admin' &&
+    data.subscriptionStatus === 'active' &&
+    (data.subscriptionPlan === 'standard' || data.subscriptionPlan === 'pro') &&
+    (getSubscriptionExpiresMillis(data.subscriptionExpiresAt) === null ||
+      (getSubscriptionExpiresMillis(data.subscriptionExpiresAt) as number) > Date.now());
+
+  if (effectiveRole !== 'admin' && !paidActiveNow) {
+    const mergedFree = Array.from(
       new Set([
-        ...existingUnlocked,
-        ...getLocalRecipeReads(getUserLocalReadsKey(firebaseUser.uid)),
+        ...existingFreeUnlocked,
+        ...getLocalRecipeReads(getUserFreeLocalReadsKey(firebaseUser.uid)),
         ...getLocalRecipeReads(GUEST_READS_KEY),
       ])
-    ).slice(0, 10);
+    ).slice(0, FREE_RECIPE_LIMIT);
 
-    syncedUnlocked = mergedBasic;
-    syncLocalRecipeReadsList(mergedBasic, getUserLocalReadsKey(firebaseUser.uid), 10);
-    syncLocalRecipeReadsList(mergedBasic, GUEST_READS_KEY, 10);
+    syncedFreeUnlocked = mergedFree;
+    syncLocalRecipeReadsList(mergedFree, getUserFreeLocalReadsKey(firebaseUser.uid), FREE_RECIPE_LIMIT);
+    syncLocalRecipeReadsList(mergedFree, GUEST_READS_KEY, FREE_RECIPE_LIMIT);
 
-    if (mergedBasic.length > existingUnlocked.length) {
+    if (
+      !Array.isArray(data.freeUnlockedRecipeIds) ||
+      mergedFree.length > existingFreeUnlocked.length
+    ) {
       try {
         await updateDoc(userRef, {
-          unlockedRecipeIds: mergedBasic,
+          freeUnlockedRecipeIds: mergedFree,
           updatedAt: serverTimestamp(),
         });
       } catch {
         // Ignore non-fatal sync update failure
       }
     }
+  }
+
+  if (effectiveRole !== 'admin' && existingPremiumUnlocked.length > 0) {
+    syncLocalRecipeReadsList(
+      existingPremiumUnlocked,
+      getUserPremiumLocalReadsKey(firebaseUser.uid),
+      500
+    );
   }
 
   const pendingProfilePatches: Record<string, unknown> = {};
@@ -449,7 +594,10 @@ export async function syncUserProfile(
     phoneNumber: (pendingProfilePatches.phoneNumber as string) || data.phoneNumber || derivedPhone,
     role: effectiveRole,
     favoriteRecipeIds: Array.isArray(data.favoriteRecipeIds) ? data.favoriteRecipeIds : [],
-    unlockedRecipeIds: syncedUnlocked,
+    unlockedRecipeIds: Array.isArray(data.unlockedRecipeIds) ? data.unlockedRecipeIds : [],
+    freeUnlockedRecipeIds: syncedFreeUnlocked,
+    premiumUnlockedRecipeIds: existingPremiumUnlocked,
+    premiumRecipeQuota: typeof data.premiumRecipeQuota === 'number' ? data.premiumRecipeQuota : 0,
     viewedHistory: mergedHistory,
     subscriptionPlan: isVerifiedSuperAdmin ? 'pro' : data.subscriptionPlan,
     subscriptionStatus: isVerifiedSuperAdmin ? 'active' : data.subscriptionStatus,
@@ -762,21 +910,20 @@ export function getRecipeQuotaLimit(planTier: PlanTier, plans: SubscriptionPlan[
   return planTier === 'pro' ? 25 : 10;
 }
 
-export async function recordRecipeUnlock(
+export async function recordFreeRecipeUnlock(
   uid: string,
-  unlockedRecipeIds: string[],
+  currentFreeIds: string[],
   recipeId: string,
-  planTier: PlanTier = 'basic'
+  isPaidActive: boolean
 ): Promise<string[]> {
-  const maxLimit = planTier === 'pro' ? 25 : 10;
-  const deduped = Array.from(new Set([...unlockedRecipeIds, recipeId])).slice(0, maxLimit);
-  saveLocalRecipeRead(recipeId, getUserLocalReadsKey(uid), maxLimit);
-  if (planTier === 'basic') {
-    saveLocalRecipeRead(recipeId, GUEST_READS_KEY, 10);
+  if (currentFreeIds.includes(recipeId)) {
+    return currentFreeIds;
   }
-
-  if (unlockedRecipeIds.includes(recipeId)) {
-    return deduped;
+  const maxLimit = isPaidActive ? 200 : FREE_RECIPE_LIMIT;
+  const deduped = Array.from(new Set([...currentFreeIds, recipeId])).slice(0, maxLimit);
+  syncLocalRecipeReadsList(deduped, getUserFreeLocalReadsKey(uid), maxLimit);
+  if (!isPaidActive) {
+    syncLocalRecipeReadsList(deduped, GUEST_READS_KEY, FREE_RECIPE_LIMIT);
   }
 
   if (!auth.currentUser) {
@@ -785,13 +932,182 @@ export async function recordRecipeUnlock(
 
   try {
     await updateDoc(doc(db, 'users', uid), {
-      unlockedRecipeIds: deduped,
+      freeUnlockedRecipeIds: deduped,
       updatedAt: serverTimestamp(),
     });
     return deduped;
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
   }
+}
+
+export async function recordPremiumRecipeUnlock(
+  uid: string,
+  currentPremiumIds: string[],
+  recipeId: string,
+  maxPremiumQuota: number
+): Promise<string[]> {
+  if (currentPremiumIds.includes(recipeId)) {
+    return currentPremiumIds;
+  }
+  const safeCap = Math.min(500, Math.max(maxPremiumQuota, currentPremiumIds.length));
+  const deduped = Array.from(new Set([...currentPremiumIds, recipeId])).slice(0, safeCap);
+  syncLocalRecipeReadsList(deduped, getUserPremiumLocalReadsKey(uid), 500);
+
+  if (!auth.currentUser) {
+    return deduped;
+  }
+
+  try {
+    await updateDoc(doc(db, 'users', uid), {
+      premiumUnlockedRecipeIds: deduped,
+      updatedAt: serverTimestamp(),
+    });
+    return deduped;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+  }
+}
+
+export async function recordRecipeUnlock(
+  uid: string,
+  unlockedRecipeIds: string[],
+  recipeId: string,
+  planTier: PlanTier = 'basic'
+): Promise<string[]> {
+  return recordFreeRecipeUnlock(uid, unlockedRecipeIds, recipeId, planTier !== 'basic');
+}
+
+const inMemoryNotifSent = new Set<string>();
+
+export async function ensureUserSystemNotification(
+  uid: string,
+  notifId: string,
+  payload: {
+    type: 'free_limit_reached' | 'pro_limit_reached' | 'plan_expiry_reminder';
+    title: string;
+    message: string;
+    recipeId?: string;
+  }
+): Promise<boolean> {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) return false;
+  const cacheKey = `rs_sys_notif_${uid}_${notifId}`;
+  if (inMemoryNotifSent.has(cacheKey)) return false;
+  try {
+    if (localStorage.getItem(cacheKey) === '1') {
+      inMemoryNotifSent.add(cacheKey);
+      return false;
+    }
+  } catch {
+    // ignore storage errors
+  }
+
+  const notifRef = doc(db, 'users', uid, 'notifications', notifId);
+  try {
+    const existingSnap = await getDoc(notifRef);
+    if (existingSnap.exists()) {
+      inMemoryNotifSent.add(cacheKey);
+      try {
+        localStorage.setItem(cacheKey, '1');
+      } catch {
+        // ignore
+      }
+      return false;
+    }
+
+    const docData: Record<string, unknown> = {
+      type: payload.type,
+      title: payload.title.slice(0, 140),
+      message: payload.message.slice(0, 400),
+      isRead: false,
+      createdAt: serverTimestamp(),
+    };
+    if (payload.recipeId) {
+      docData.recipeId = payload.recipeId;
+    }
+
+    await setDoc(notifRef, docData);
+    inMemoryNotifSent.add(cacheKey);
+    try {
+      localStorage.setItem(cacheKey, '1');
+    } catch {
+      // ignore
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function notifyFreeLimitReached(uid: string): Promise<boolean> {
+  return ensureUserSystemNotification(uid, 'ntf_free_limit_10', {
+    type: 'free_limit_reached',
+    title: 'ফ্রি রেসিপির লিমিট শেষ হয়েছে',
+    message:
+      'আপনার ১০টি ফ্রি রেসিপি দেখার লিমিট শেষ হয়ে গেছে। নতুন রেসিপি দেখতে অনুগ্রহ করে প্রো প্ল্যান কিনুন বা প্ল্যান আপগ্রেড করুন।',
+  });
+}
+
+export async function notifyProLimitReached(uid: string, totalQuota: number): Promise<boolean> {
+  const safeQuota = Math.max(1, Math.round(totalQuota));
+  return ensureUserSystemNotification(uid, `ntf_pro_limit_${safeQuota}`, {
+    type: 'pro_limit_reached',
+    title: 'প্রো প্ল্যানের রেসিপি লিমিট শেষ হয়েছে',
+    message:
+      'আপনার প্রো প্ল্যানের নির্ধারিত সব প্রিমিয়াম রেসিপি দেখার লিমিট শেষ হয়ে গেছে। আরও নতুন প্রিমিয়াম রেসিপি দেখতে প্ল্যান আপগ্রেড করুন বা নতুন প্যাক কিনুন। (আগে দেখা প্রিমিয়াম রেসিপিগুলো সবসময় আনলক থাকবে।)',
+  });
+}
+
+export async function checkAndNotifyPlanExpiry(
+  user: UserProfile | null
+): Promise<{ notified: boolean; isExpired: boolean; isExpiringSoon: boolean; message?: string }> {
+  if (!user || user.role === 'admin') {
+    return { notified: false, isExpired: false, isExpiringSoon: false };
+  }
+  if (user.subscriptionPlan !== 'standard' && user.subscriptionPlan !== 'pro') {
+    return { notified: false, isExpired: false, isExpiringSoon: false };
+  }
+  const expMs = getSubscriptionExpiresMillis(user.subscriptionExpiresAt);
+  if (expMs === null) {
+    return { notified: false, isExpired: false, isExpiringSoon: false };
+  }
+
+  const remainingMs = expMs - Date.now();
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  if (remainingMs > ONE_DAY_MS) {
+    return { notified: false, isExpired: false, isExpiringSoon: false };
+  }
+
+  const isExpired = remainingMs <= 0;
+  const dayBucket = Math.floor(expMs / ONE_DAY_MS);
+  const notifId = isExpired ? `ntf_plan_expired_${dayBucket}` : `ntf_plan_expiring_${dayBucket}`;
+  const planLabel = user.subscriptionPlan === 'pro' ? 'প্রো' : 'স্ট্যান্ডার্ড';
+  const expDateLabel = new Date(expMs).toLocaleDateString('bn-BD', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const title = isExpired
+    ? `${planLabel} প্ল্যানের মেয়াদ শেষ হয়েছে — রিনিউ করুন`
+    : `${planLabel} প্ল্যানের মেয়াদ ১ দিনের মধ্যে শেষ হবে`;
+
+  const message = isExpired
+    ? `আপনার ${planLabel} প্ল্যানের ১ মাসের মেয়াদ শেষ হয়ে গেছে। নতুন প্রিমিয়াম রেসিপি দেখতে অনুগ্রহ করে প্ল্যান রিনিউ করুন। আপনার আগে দেখা প্রিমিয়াম রেসিপিগুলো সবসময় আনলক থাকবে।`
+    : `আপনার ${planLabel} প্ল্যানের ১ মাসের মেয়াদ আগামী ১ দিনের মধ্যে (${expDateLabel}) শেষ হয়ে যাবে। নিরবচ্ছিন্নভাবে নতুন রেসিপি দেখতে এখনই প্ল্যান রিনিউ করুন।`;
+
+  const notified = await ensureUserSystemNotification(user.uid, notifId, {
+    type: 'plan_expiry_reminder',
+    title,
+    message,
+  });
+
+  return {
+    notified,
+    isExpired,
+    isExpiringSoon: !isExpired,
+    message: notified ? title : undefined,
+  };
 }
 
 export async function updateUserProfilePhoto(uid: string, photoURL: string): Promise<void> {
@@ -953,6 +1269,13 @@ export async function submitSubscriptionOrder(params: {
   const isFree = plan.tier === 'basic' && plan.priceAmount === 0;
 
   try {
+    const orderRecipeLimit =
+      plan.recipeLimit && plan.recipeLimit > 0
+        ? Math.round(plan.recipeLimit)
+        : plan.tier === 'pro'
+          ? 25
+          : 10;
+
     if (isFree) {
       const expiresAt = Timestamp.fromDate(
         new Date(Date.now() + plan.durationDays * 24 * 60 * 60 * 1000)
@@ -966,6 +1289,7 @@ export async function submitSubscriptionOrder(params: {
         planName: plan.name,
         planTier: plan.tier,
         durationDays: plan.durationDays,
+        recipeLimit: orderRecipeLimit,
         amount: 0,
         paymentMethod: 'ফ্রি',
         senderNumber: '-',
@@ -1001,6 +1325,7 @@ export async function submitSubscriptionOrder(params: {
       planName: plan.name,
       planTier: plan.tier,
       durationDays: plan.durationDays,
+      recipeLimit: orderRecipeLimit,
       amount: plan.priceAmount,
       paymentMethod,
       senderNumber: cleanSender,
@@ -1023,36 +1348,86 @@ export async function submitSubscriptionOrder(params: {
   }
 }
 
-export async function approveSubscriptionOrderAdmin(order: {
-  id: string;
-  userId: string;
-  planTier: PlanTier;
-  planName?: string;
-  amount?: number;
-  durationDays?: number;
-}): Promise<void> {
+export async function approveSubscriptionOrderAdmin(
+  order: {
+    id: string;
+    userId: string;
+    planId?: string;
+    planTier: PlanTier;
+    planName?: string;
+    amount?: number;
+    durationDays?: number;
+    recipeLimit?: number;
+  },
+  plans: SubscriptionPlan[] = []
+): Promise<void> {
   const days = order.durationDays || 30;
-  const expiresAt = Timestamp.fromDate(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
   const notifId = `ntf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const planLabel = order.planName || (order.planTier === 'pro' ? 'প্রো' : 'স্ট্যান্ডার্ড');
 
+  const matchedPlan = plans.find((p) => p.id === order.planId || p.tier === order.planTier);
+  const orderRecipeLimit =
+    order.recipeLimit && order.recipeLimit > 0
+      ? Math.round(order.recipeLimit)
+      : matchedPlan?.recipeLimit && matchedPlan.recipeLimit > 0
+        ? Math.round(matchedPlan.recipeLimit)
+        : order.planTier === 'pro'
+          ? 25
+          : 10;
+
   try {
+    const userRef = doc(db, 'users', order.userId);
+    const userSnap = await getDoc(userRef);
+    const userData = userSnap.exists() ? (userSnap.data() as UserProfile) : null;
+
+    const existingPremiumUnlocked = Array.isArray(userData?.premiumUnlockedRecipeIds)
+      ? userData.premiumUnlockedRecipeIds
+      : [];
+    const existingQuota =
+      typeof userData?.premiumRecipeQuota === 'number' && userData.premiumRecipeQuota > 0
+        ? userData.premiumRecipeQuota
+        : 0;
+    const prevExpMs = getSubscriptionExpiresMillis(userData?.subscriptionExpiresAt);
+    const prevPaidActive = Boolean(
+      userData &&
+        userData.subscriptionStatus === 'active' &&
+        (userData.subscriptionPlan === 'standard' || userData.subscriptionPlan === 'pro') &&
+        (prevExpMs === null || prevExpMs > Date.now())
+    );
+
+    const activeRemaining = prevPaidActive
+      ? Math.max(0, existingQuota - existingPremiumUnlocked.length)
+      : 0;
+    const newTotalPremiumQuota = Math.min(
+      500,
+      existingPremiumUnlocked.length + activeRemaining + orderRecipeLimit
+    );
+    const newAvailableCount = Math.max(0, newTotalPremiumQuota - existingPremiumUnlocked.length);
+
+    const freshExpiryMs = Date.now() + days * 24 * 60 * 60 * 1000;
+    const finalExpiryMs =
+      prevPaidActive && prevExpMs && prevExpMs > freshExpiryMs ? prevExpMs : freshExpiryMs;
+    const expiresAt = Timestamp.fromDate(new Date(finalExpiryMs));
+
+    const toBn = (n: number) =>
+      String(n).replace(/\d/g, (d) => ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'][Number(d)]);
+
     const batch = writeBatch(db);
     batch.update(doc(db, 'subscriptionOrders', order.id), {
       status: 'active',
     });
-    batch.update(doc(db, 'users', order.userId), {
+    batch.update(userRef, {
       subscriptionPlan: order.planTier,
       subscriptionStatus: 'active',
       subscriptionExpiresAt: expiresAt,
       lastOrderId: order.id,
-      unlockedRecipeIds: [],
+      premiumRecipeQuota: newTotalPremiumQuota,
       updatedAt: serverTimestamp(),
     });
     batch.set(doc(db, 'users', order.userId, 'notifications', notifId), {
       type: 'payment_approved',
       title: 'পেমেন্ট অনুমোদিত হয়েছে!',
-      message: `অভিনন্দন! আপনার ${planLabel} প্ল্যান${order.amount ? ` (${order.amount} টাকা)` : ''} সক্রিয় করা হয়েছে। এখনই প্রিমিয়াম রেসিপি শিখুন।`,
+      message: `অভিনন্দন! আপনার ${planLabel} প্ল্যান${order.amount ? ` (${toBn(order.amount)} টাকা)` : ''} সক্রিয় করা হয়েছে। নতুন ${toBn(orderRecipeLimit)}টি প্রিমিয়াম রেসিপি যুক্ত হয়ে এখন মোট ${toBn(newAvailableCount)}টি নতুন প্রিমিয়াম রেসিপি আনলক করতে পারবেন।`,
       orderId: order.id,
       isRead: false,
       createdAt: serverTimestamp(),
@@ -1313,16 +1688,51 @@ export async function updateUserByAdmin(
     role: 'member' | 'admin';
     email: string;
     currentAdminUid: string;
-  }
+  },
+  plans: SubscriptionPlan[] = []
 ): Promise<void> {
   try {
-    const batch = writeBatch(db);
-    batch.update(doc(db, 'users', targetUid), {
+    const userRef = doc(db, 'users', targetUid);
+    const snap = await getDoc(userRef);
+    const existingData = snap.exists() ? (snap.data() as UserProfile) : null;
+
+    const userPatch: Record<string, unknown> = {
       subscriptionPlan: updates.subscriptionPlan,
       subscriptionStatus: updates.subscriptionStatus,
       role: updates.role,
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    if (
+      updates.subscriptionStatus === 'active' &&
+      (updates.subscriptionPlan === 'standard' || updates.subscriptionPlan === 'pro')
+    ) {
+      const planLimit = getRecipeQuotaLimit(updates.subscriptionPlan, plans);
+      const existingPremiumUnlocked = Array.isArray(existingData?.premiumUnlockedRecipeIds)
+        ? existingData.premiumUnlockedRecipeIds.length
+        : 0;
+      const existingQuota =
+        typeof existingData?.premiumRecipeQuota === 'number' ? existingData.premiumRecipeQuota : 0;
+      const prevExpMs = getSubscriptionExpiresMillis(existingData?.subscriptionExpiresAt);
+      const planChanged =
+        existingData?.subscriptionPlan !== updates.subscriptionPlan ||
+        existingData?.subscriptionStatus !== 'active';
+
+      if (planChanged || existingQuota <= existingPremiumUnlocked) {
+        userPatch.premiumRecipeQuota = Math.min(
+          500,
+          Math.max(existingQuota, existingPremiumUnlocked + planLimit)
+        );
+      }
+      if (!prevExpMs || prevExpMs <= Date.now() || planChanged) {
+        userPatch.subscriptionExpiresAt = Timestamp.fromDate(
+          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        );
+      }
+    }
+
+    const batch = writeBatch(db);
+    batch.update(userRef, userPatch);
     if (updates.role === 'admin') {
       batch.set(doc(db, 'admins', targetUid), {
         email: updates.email,

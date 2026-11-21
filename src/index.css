@@ -221,6 +221,80 @@
   font-family: inherit;
 }
 
+/* Dynamic User Profile Font & Font Size (Controlled from Admin Font Settings) */
+.profile-font-bensen {
+  --profile-font-family: 'Bensen Handwriting', 'Noto Serif Bengali', serif;
+  --profile-font-style: normal;
+  --profile-word-spacing: 0.14em;
+  --profile-letter-spacing: 0.01em;
+}
+.profile-font-atma {
+  --profile-font-family: 'Atma', 'Noto Serif Bengali', cursive, serif;
+  --profile-font-style: normal;
+  --profile-word-spacing: 0.1em;
+  --profile-letter-spacing: 0.01em;
+}
+.profile-font-tiro-italic {
+  --profile-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+  --profile-font-style: italic;
+  --profile-word-spacing: 0.08em;
+  --profile-letter-spacing: 0.005em;
+}
+.profile-font-noto-serif {
+  --profile-font-family: 'Noto Serif Bengali', Georgia, serif;
+  --profile-font-style: normal;
+  --profile-word-spacing: 0.03em;
+  --profile-letter-spacing: normal;
+}
+.profile-font-tiro {
+  --profile-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+  --profile-font-style: normal;
+  --profile-word-spacing: 0.04em;
+  --profile-letter-spacing: normal;
+}
+.profile-font-hind-siliguri {
+  --profile-font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
+  --profile-font-style: normal;
+  --profile-word-spacing: normal;
+  --profile-letter-spacing: normal;
+}
+.profile-font-noto-sans {
+  --profile-font-family: 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
+  --profile-font-style: normal;
+  --profile-word-spacing: normal;
+  --profile-letter-spacing: normal;
+}
+
+.profile-size-sm { --profile-scale: 0.9; }
+.profile-size-md { --profile-scale: 1; }
+.profile-size-lg { --profile-scale: 1.12; }
+.profile-size-xl { --profile-scale: 1.24; }
+
+.profile-typography-scope {
+  font-family: var(--profile-font-family, 'Hind Siliguri', system-ui, -apple-system, sans-serif);
+  font-style: var(--profile-font-style, normal);
+  word-spacing: var(--profile-word-spacing, normal);
+  letter-spacing: var(--profile-letter-spacing, normal);
+  font-size: calc(1rem * var(--profile-scale, 1));
+  --font-sans: var(--profile-font-family, 'Hind Siliguri', system-ui, -apple-system, sans-serif);
+  --font-display: var(--profile-font-family, 'Noto Serif Bengali', 'Hind Siliguri', serif);
+  --font-book: var(--profile-font-family, 'Noto Serif Bengali', Georgia, serif);
+  --text-xs: calc(0.75rem * var(--profile-scale, 1));
+  --text-sm: calc(0.875rem * var(--profile-scale, 1));
+  --text-base: calc(1rem * var(--profile-scale, 1));
+  --text-lg: calc(1.125rem * var(--profile-scale, 1));
+  --text-xl: calc(1.25rem * var(--profile-scale, 1));
+  --text-2xl: calc(1.5rem * var(--profile-scale, 1));
+  --text-3xl: calc(1.875rem * var(--profile-scale, 1));
+}
+
+.profile-typography-scope input,
+.profile-typography-scope textarea,
+.profile-typography-scope select,
+.profile-typography-scope button {
+  font-family: inherit;
+}
+
 /* Dynamic Responsive Recipe Post Font Size (PC & Mobile Separately) */
 .rf-size-m-sm { --rf-scale: 0.9; }
 .rf-size-m-md { --rf-scale: 1; }
