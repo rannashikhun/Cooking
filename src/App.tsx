@@ -698,8 +698,13 @@ export default function App() {
         onNotificationClick={handleNotificationClick}
         onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
         categories={categories}
+        recipes={recipes}
         selectedCategory={route.page === 'category' ? route.categoryName : selectedFilter}
         onSelectCategory={navigateToCategory}
+        freeUsedCount={freeUnlockedIds?.length}
+        freeQuotaLimit={FREE_RECIPE_LIMIT}
+        premiumUsedCount={premiumUnlockedIds?.length}
+        premiumQuotaLimit={premiumQuotaLimit}
       />
 
       {toastMsg && (

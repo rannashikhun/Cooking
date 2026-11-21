@@ -566,44 +566,44 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* Tabbed Free Recipes, Permanently Unlocked Premium Recipes & Favorite Recipes */}
-      <div className="bg-white rounded-3xl border border-gray-200 p-6 sm:p-7">
-        <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 border-b border-gray-100 pb-4 mb-5">
+      <div className="bg-white rounded-3xl border border-gray-200 p-4 sm:p-7">
+        <div className="flex flex-nowrap items-center justify-center md:justify-start gap-1.5 sm:gap-2 border-b border-gray-100 pb-4 mb-5">
           <button
             type="button"
             onClick={() => setActiveRecipeTab('free')}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer ${
+            className={`inline-flex items-center justify-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-sm font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
               activeRecipeTab === 'free'
                 ? 'bg-[#1B4D24] text-white shadow-xs'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            <BookOpen className="w-4 h-4" />
+            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
             <span>ফ্রি রেসিপি ({toBengaliDigits(freeRecipeItems.length)})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveRecipeTab('premium')}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer ${
+            className={`inline-flex items-center justify-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-sm font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
               activeRecipeTab === 'premium'
                 ? 'bg-[#C69214] text-white shadow-xs'
                 : 'bg-amber-50 text-[#9A6E04] hover:bg-amber-100/80 border border-amber-200/70'
             }`}
           >
-            <Crown className="w-4 h-4" />
+            <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
             <span>প্রিমিয়াম রেসিপি ({toBengaliDigits(premiumRecipeItems.length)})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveRecipeTab('favorites')}
-            className={`hidden md:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer ${
+            className={`hidden md:inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-colors cursor-pointer ${
               activeRecipeTab === 'favorites'
                 ? 'bg-[#B92B27] text-white shadow-xs'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            <Heart className="w-4 h-4" />
+            <Heart className="w-4 h-4 shrink-0" />
             <span>প্রিয় রেসিপি ({toBengaliDigits(favoriteRecipes.length)})</span>
           </button>
         </div>

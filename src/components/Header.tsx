@@ -21,8 +21,14 @@ import {
 import { Timestamp } from 'firebase/firestore';
 import { BrandMark } from './BrandMark';
 import { CategoryIcon } from './CategoryIcon';
-import { PHONE_EMAIL_DOMAIN, formatUserContact } from '../services/firestoreService';
-import type { ActiveTab, RecipeCategory, UserNotification, UserProfile } from '../types';
+import {
+  FREE_RECIPE_LIMIT,
+  getUserFreeUnlockedIds,
+  getUserPremiumQuota,
+  getUserPremiumUnlockedIds,
+  isPaidPlanActive,
+} from '../services/firestoreService';
+import type { ActiveTab, Recipe, RecipeCategory, UserNotification, UserProfile } from '../types';
 
 interface HeaderProps {
   siteName: string;
@@ -39,8 +45,13 @@ interface HeaderProps {
   onNotificationClick?: (notif: UserNotification) => void;
   onMarkAllNotificationsRead?: () => void;
   categories?: RecipeCategory[];
+  recipes?: Recipe[];
   selectedCategory?: string;
   onSelectCategory?: (categoryName: string) => void;
+  freeUsedCount?: number;
+  freeQuotaLimit?: number;
+  premiumUsedCount?: number;
+  premiumQuotaLimit?: number;
 }
 
 const toBengaliDigits = (val: string | number): string => {
@@ -103,9 +114,52 @@ export const Header: React.FC<HeaderProps> = ({
   onNotificationClick,
   onMarkAllNotificationsRead,
   categories = [],
+  recipes = [],
   selectedCategory = 'সব',
   onSelectCategory,
+  freeUsedCount,
+  freeQuotaLimit = FREE_RECIPE_LIMIT,
+  premiumUsedCount,
+  premiumQuotaLimit,
 }) => {
+  const countCategoryRecipes = (categoryName: string): number => {
+    const clean = categoryName.trim();
+    return recipes.filter((r) => {
+      if ((r.category || '').trim() === clean) return true;
+      if (clean === 'মিষ্টান্ন' && r.category === 'মিষ্টি') return true;
+      if (
+        clean === 'মাছের রেসিপি' &&
+        (r.title.includes('মাছ') || r.title.includes('ইলিশ') || r.title.includes('চিংড়ি'))
+      ) {
+        return true;
+      }
+      if (
+        clean === 'মাংসের রেসিপি' &&
+        (r.title.includes('মাটন') || r.title.includes('মাংস') || r.title.includes('মুরগি'))
+      ) {
+        return true;
+      }
+      if (
+        clean === 'ভাত ও পোলাও' &&
+        (r.title.includes('ভাত') || r.title.includes('পোলাও') || r.title.includes('বিরিয়ানি'))
+      ) {
+        return true;
+      }
+      if (clean === 'সবজি রেসিপি' && (r.title.includes('আলু') || r.title.includes('সবজি'))) {
+        return true;
+      }
+      if (
+        clean === 'চাইনিজ রেসিপি' &&
+        (r.cuisine === 'চাইনিজ' ||
+          r.title.includes('চাইনিজ') ||
+          r.title.includes('নুডলস') ||
+          r.title.includes('ফ্রাইড রাইস'))
+      ) {
+        return true;
+      }
+      return false;
+    }).length;
+  };
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -598,14 +652,18 @@ export const Header: React.FC<HeaderProps> = ({
 
               {categories.filter((c) => c.isActive !== false).length > 0 && (
                 <div className="mt-5 pt-4 border-t border-gray-100">
-                  <p className="px-2 text-xs font-bold text-gray-500 mb-2.5">
-                    রেসিপি ক্যাটাগরি
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between px-1 mb-3">
+                    <p className="text-xs font-bold text-gray-600">রেসিপি ক্যাটাগরি</p>
+                    <span className="font-numeral-bn text-[11px] font-semibold text-[#1B4D24] bg-[#1B4D24]/8 px-2 py-0.5 rounded-full tabular-nums">
+                      {toBengaliDigits(categories.filter((c) => c.isActive !== false).length)}টি
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
                     {categories
                       .filter((c) => c.isActive !== false)
                       .map((cat) => {
                         const isSelected = selectedCategory === cat.name && activeTab === 'recipes';
+                        const recipeCount = countCategoryRecipes(cat.name);
                         return (
                           <button
                             key={cat.id}
@@ -614,21 +672,42 @@ export const Header: React.FC<HeaderProps> = ({
                               setMobileMenuOpen(false);
                               onSelectCategory?.(cat.name);
                             }}
-                            className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition-colors ${
+                            className={`flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border text-center transition-all cursor-pointer ${
                               isSelected
-                                ? 'bg-[#F8EAE6] ring-1 ring-[#B92B27]/50 text-[#B92B27] font-bold'
-                                : 'bg-[#FDF5F3] hover:bg-[#F9EAE6] text-[#1A1A1A] font-medium'
+                                ? 'bg-[#FDF2F0] border-[#B92B27]/45 ring-1 ring-[#B92B27]/20 shadow-2xs'
+                                : 'bg-[#FAF8F5] hover:bg-[#FDF4F1] border-gray-100 hover:border-[#E8C6BD]'
                             }`}
                           >
-                            <CategoryIcon
-                              iconKey={cat.iconKey}
-                              iconImageUrl={cat.iconImageUrl}
-                              name={cat.name}
-                              size="sm"
-                            />
-                            <span className="text-xs leading-tight line-clamp-1">
-                              {cat.name}
+                            <span
+                              className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
+                                isSelected
+                                  ? 'bg-white border-[#B92B27]/20 shadow-2xs'
+                                  : 'bg-white border-gray-200/70'
+                              }`}
+                            >
+                              <CategoryIcon
+                                iconKey={cat.iconKey}
+                                iconImageUrl={cat.iconImageUrl}
+                                name={cat.name}
+                                size="sm"
+                              />
                             </span>
+                            <div className="w-full min-w-0">
+                              <p
+                                className={`text-[12.5px] leading-snug break-words ${
+                                  isSelected ? 'font-bold text-[#B92B27]' : 'font-bold text-[#1A1A1A]'
+                                }`}
+                              >
+                                {cat.name}
+                              </p>
+                              <p
+                                className={`font-numeral-bn text-[11px] font-semibold mt-0.5 tabular-nums ${
+                                  isSelected ? 'text-[#B92B27]/85' : 'text-[#1B4D24]'
+                                }`}
+                              >
+                                {toBengaliDigits(recipeCount)}টি রেসিপি
+                              </p>
+                            </div>
                           </button>
                         );
                       })}
@@ -655,10 +734,35 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-gray-900 truncate">{user.displayName}</p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {user.email && !user.email.endsWith(PHONE_EMAIL_DOMAIN)
-                          ? user.email
-                          : formatUserContact(user.email, user.phoneNumber)}
+                      <p className="font-numeral-bn text-xs font-medium text-[#1B4D24] leading-snug tabular-nums">
+                        {(() => {
+                          if (user.role === 'admin') {
+                            return 'এডমিন · সীমাহীন রেসিপি';
+                          }
+                          const paidActive = isPaidPlanActive(user);
+                          const freeUsed = Math.min(
+                            freeUsedCount ?? getUserFreeUnlockedIds(user).length,
+                            freeQuotaLimit
+                          );
+                          const premUsed =
+                            premiumUsedCount ?? getUserPremiumUnlockedIds(user).length;
+                          const premTotal =
+                            premiumQuotaLimit ?? getUserPremiumQuota(user);
+
+                          if (paidActive) {
+                            const planLabel =
+                              user.subscriptionPlan === 'pro' ? 'প্রো প্ল্যান' : 'স্ট্যান্ডার্ড প্ল্যান';
+                            return `${planLabel} · কোটা: ${toBengaliDigits(premUsed)}/${toBengaliDigits(premTotal)} টি`;
+                          }
+                          if (user.subscriptionPlan === 'pro' || user.subscriptionPlan === 'standard') {
+                            const planLabel =
+                              user.subscriptionPlan === 'pro'
+                                ? 'প্রো (মেয়াদ শেষ)'
+                                : 'স্ট্যান্ডার্ড (মেয়াদ শেষ)';
+                            return `${planLabel} · ফ্রি কোটা: ${toBengaliDigits(freeUsed)}/${toBengaliDigits(freeQuotaLimit)} টি`;
+                          }
+                          return `বেসিক (ফ্রি) · কোটা: ${toBengaliDigits(freeUsed)}/${toBengaliDigits(freeQuotaLimit)} টি`;
+                        })()}
                       </p>
                     </div>
                   </div>
