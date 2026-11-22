@@ -59,8 +59,7 @@ service cloud.firestore {
     }
 
     function freeRecipeAccessAllowed(u, recipeId) {
-      return hasActivePaidSubData(u) ||
-        ('freeUnlockedRecipeIds' in u && recipeId in u.freeUnlockedRecipeIds) ||
+      return ('freeUnlockedRecipeIds' in u && recipeId in u.freeUnlockedRecipeIds) ||
         ('unlockedRecipeIds' in u && recipeId in u.unlockedRecipeIds) ||
         !('freeUnlockedRecipeIds' in u) ||
         u.freeUnlockedRecipeIds.size() < 10;
@@ -469,26 +468,19 @@ service cloud.firestore {
             incoming().role == existing().role &&
             incoming().diff(existing()).affectedKeys().hasOnly([
               'displayName', 'photoURL', 'phoneNumber', 'address', 'age', 'favoriteRecipeIds',
-              'unlockedRecipeIds', 'freeUnlockedRecipeIds', 'premiumUnlockedRecipeIds',
+              'freeUnlockedRecipeIds', 'premiumUnlockedRecipeIds',
               'viewedHistory', 'updatedAt'
             ]) &&
             incoming().subscriptionPlan == existing().subscriptionPlan &&
             incoming().subscriptionStatus == existing().subscriptionStatus &&
             (!('freeUnlockedRecipeIds' in incoming().diff(existing()).affectedKeys()) || (
               (!('freeUnlockedRecipeIds' in existing()) || incoming().freeUnlockedRecipeIds.hasAll(existing().freeUnlockedRecipeIds)) &&
-              (
-                (hasActivePaidSubData(existing()) && incoming().freeUnlockedRecipeIds.size() <= 200) ||
-                incoming().freeUnlockedRecipeIds.size() <= 10
-              )
+              incoming().freeUnlockedRecipeIds.size() <= 10
             )) &&
             (!('premiumUnlockedRecipeIds' in incoming().diff(existing()).affectedKeys()) || (
               hasActivePaidSubData(existing()) &&
               (!('premiumUnlockedRecipeIds' in existing()) || incoming().premiumUnlockedRecipeIds.hasAll(existing().premiumUnlockedRecipeIds)) &&
               incoming().premiumUnlockedRecipeIds.size() <= effectivePremiumQuota(existing())
-            )) &&
-            (!('unlockedRecipeIds' in incoming().diff(existing()).affectedKeys()) || (
-              (!('unlockedRecipeIds' in existing()) || incoming().unlockedRecipeIds.hasAll(existing().unlockedRecipeIds)) &&
-              incoming().unlockedRecipeIds.size() <= 500
             ))
           ) ||
           (

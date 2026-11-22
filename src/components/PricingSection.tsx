@@ -163,6 +163,11 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
             );
           })}
         </div>
+        <p className="mt-6 text-center text-xs text-gray-600 max-w-2xl mx-auto leading-relaxed">
+          <span className="font-semibold text-[#1B4D24]">বিঃদ্রঃ</span> যেকোনো প্ল্যান আপগ্রেড করলে শুধু{' '}
+          <span className="font-semibold text-[#1A1A1A]">প্রিমিয়াম রেসিপির কোটা</span> বৃদ্ধি পাবে — প্রতিটি অ্যাকাউন্ট থেকে ফ্রি রেসিপি সর্বোচ্চ{' '}
+          <span className="font-numeral-bn font-semibold text-[#1A1A1A]">১০</span>টিই দেখা যাবে।
+        </p>
       </div>
     </section>
   );

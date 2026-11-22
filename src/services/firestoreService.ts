@@ -534,22 +534,30 @@ export async function syncUserProfile(
     (getSubscriptionExpiresMillis(data.subscriptionExpiresAt) === null ||
       (getSubscriptionExpiresMillis(data.subscriptionExpiresAt) as number) > Date.now());
 
-  if (effectiveRole !== 'admin' && !paidActiveNow) {
-    const mergedFree = Array.from(
-      new Set([
-        ...existingFreeUnlocked,
-        ...getLocalRecipeReads(getUserFreeLocalReadsKey(firebaseUser.uid)),
-        ...getLocalRecipeReads(GUEST_READS_KEY),
-      ])
-    ).slice(0, FREE_RECIPE_LIMIT);
+  if (effectiveRole !== 'admin') {
+    const localUserFree = getLocalRecipeReads(getUserFreeLocalReadsKey(firebaseUser.uid));
+    const guestReads = paidActiveNow ? [] : getLocalRecipeReads(GUEST_READS_KEY);
+    const mergedFree =
+      existingFreeUnlocked.length >= FREE_RECIPE_LIMIT
+        ? existingFreeUnlocked
+        : Array.from(new Set([...existingFreeUnlocked, ...localUserFree, ...guestReads])).slice(
+            0,
+            FREE_RECIPE_LIMIT
+          );
 
     syncedFreeUnlocked = mergedFree;
-    syncLocalRecipeReadsList(mergedFree, getUserFreeLocalReadsKey(firebaseUser.uid), FREE_RECIPE_LIMIT);
-    syncLocalRecipeReadsList(mergedFree, GUEST_READS_KEY, FREE_RECIPE_LIMIT);
+    syncLocalRecipeReadsList(
+      mergedFree,
+      getUserFreeLocalReadsKey(firebaseUser.uid),
+      Math.max(FREE_RECIPE_LIMIT, mergedFree.length)
+    );
+    if (!paidActiveNow) {
+      syncLocalRecipeReadsList(mergedFree, GUEST_READS_KEY, FREE_RECIPE_LIMIT);
+    }
 
     if (
-      !Array.isArray(data.freeUnlockedRecipeIds) ||
-      mergedFree.length > existingFreeUnlocked.length
+      mergedFree.length <= FREE_RECIPE_LIMIT &&
+      (!Array.isArray(data.freeUnlockedRecipeIds) || mergedFree.length > existingFreeUnlocked.length)
     ) {
       try {
         await updateDoc(userRef, {
@@ -897,7 +905,7 @@ export async function fetchRecipeContent(recipeId: string, isPremium: boolean, h
     return { content: null, locked: false };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    if (msg.includes('Missing or insufficient permissions') && isPremium) {
+    if (msg.includes('Missing or insufficient permissions')) {
       return { content: null, locked: true };
     }
     const localSeed = SEED_RECIPES.find((r) => r.recipe.id === recipeId);
@@ -920,14 +928,13 @@ export async function recordFreeRecipeUnlock(
   uid: string,
   currentFreeIds: string[],
   recipeId: string,
-  isPaidActive: boolean
+  isPaidActive = false
 ): Promise<string[]> {
-  if (currentFreeIds.includes(recipeId)) {
+  if (currentFreeIds.includes(recipeId) || currentFreeIds.length >= FREE_RECIPE_LIMIT) {
     return currentFreeIds;
   }
-  const maxLimit = isPaidActive ? 200 : FREE_RECIPE_LIMIT;
-  const deduped = Array.from(new Set([...currentFreeIds, recipeId])).slice(0, maxLimit);
-  syncLocalRecipeReadsList(deduped, getUserFreeLocalReadsKey(uid), maxLimit);
+  const deduped = Array.from(new Set([...currentFreeIds, recipeId])).slice(0, FREE_RECIPE_LIMIT);
+  syncLocalRecipeReadsList(deduped, getUserFreeLocalReadsKey(uid), FREE_RECIPE_LIMIT);
   if (!isPaidActive) {
     syncLocalRecipeReadsList(deduped, GUEST_READS_KEY, FREE_RECIPE_LIMIT);
   }
@@ -1050,7 +1057,7 @@ export async function notifyFreeLimitReached(uid: string): Promise<boolean> {
     type: 'free_limit_reached',
     title: 'ফ্রি রেসিপির লিমিট শেষ হয়েছে',
     message:
-      'আপনার ১০টি ফ্রি রেসিপি দেখার লিমিট শেষ হয়ে গেছে। নতুন রেসিপি দেখতে অনুগ্রহ করে প্রো প্ল্যান কিনুন বা প্ল্যান আপগ্রেড করুন।',
+      'আপনার সর্বোচ্চ ১০টি ফ্রি রেসিপি দেখার লিমিট শেষ হয়ে গেছে। নতুন প্রিমিয়াম রেসিপি দেখতে প্ল্যান কিনুন বা আপগ্রেড করুন। (প্ল্যান আপগ্রেড করলে শুধু প্রিমিয়াম রেসিপির কোটা বাড়ে; ফ্রি রেসিপি সর্বোচ্চ ১০টিই দেখা যায়।)',
   });
 }
 

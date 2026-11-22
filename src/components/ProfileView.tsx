@@ -522,7 +522,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     <span className="inline-flex items-center gap-1 text-[#1A1A1A] tabular-nums">
                       <BookOpen className="w-3.5 h-3.5 text-[#1B4D24]" />
                       {paidActive
-                        ? `প্রিমিয়াম কোটা: ${toBengaliDigits(premiumUnlockedIds.length)} / ${toBengaliDigits(premiumQuotaTotal)} টি (বাকি ${toBengaliDigits(remainingNewPremium)} টি)`
+                        ? `প্রিমিয়াম: ${toBengaliDigits(premiumUnlockedIds.length)}/${toBengaliDigits(premiumQuotaTotal)} টি (বাকি ${toBengaliDigits(remainingNewPremium)}) · ফ্রি: ${toBengaliDigits(Math.min(freeUsedCount, FREE_RECIPE_LIMIT))}/${toBengaliDigits(FREE_RECIPE_LIMIT)} টি`
                         : `ফ্রি কোটা: ${toBengaliDigits(Math.min(freeUsedCount, FREE_RECIPE_LIMIT))} / ${toBengaliDigits(FREE_RECIPE_LIMIT)} টি (বাকি ${toBengaliDigits(freeRemainingCount)} টি)`}
                     </span>
                   </>
@@ -729,10 +729,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <p className="mt-1 text-lg font-bold text-[#1B4D24] tabular-nums">
               {user.role === 'admin'
                 ? 'সীমাহীন'
-                : paidActive
-                  ? 'আনলিমিটেড (সক্রিয় প্ল্যান)'
-                  : `${toBengaliDigits(Math.min(freeUsedCount, FREE_RECIPE_LIMIT))} / ${toBengaliDigits(FREE_RECIPE_LIMIT)} টি`}
+                : `${toBengaliDigits(Math.min(freeUsedCount, FREE_RECIPE_LIMIT))} / ${toBengaliDigits(FREE_RECIPE_LIMIT)} টি`}
             </p>
+            {user.role !== 'admin' && (
+              <p className="text-[11px] text-gray-500 mt-0.5 tabular-nums">
+                সর্বোচ্চ {toBengaliDigits(FREE_RECIPE_LIMIT)}টি ফ্রি রেসিপি (বাকি {toBengaliDigits(freeRemainingCount)} টি)
+              </p>
+            )}
           </div>
 
           <div className="p-4 rounded-2xl bg-[#FAFAF8] border border-gray-100">
@@ -914,17 +917,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             {user.role !== 'admin' && (
               <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-[#EEF6EF] border border-[#1B4D24]/20 text-xs text-[#1B4D24]">
                 <span className="font-medium leading-relaxed">
-                  {paidActive
-                    ? 'আপনার সক্রিয় প্রো/স্ট্যান্ডার্ড প্ল্যানে সব ফ্রি রেসিপি আনলিমিটেড দেখতে পারবেন।'
-                    : `ফ্রি কোটা ব্যবহৃত: ${toBengaliDigits(Math.min(freeUsedCount, FREE_RECIPE_LIMIT))} / ${toBengaliDigits(FREE_RECIPE_LIMIT)} টি (একই রেসিপি বারবার দেখলেও ১ বারই গণনা হয়)`}
+                  ফ্রি কোটা ব্যবহৃত: {toBengaliDigits(Math.min(freeUsedCount, FREE_RECIPE_LIMIT))} / {toBengaliDigits(FREE_RECIPE_LIMIT)} টি (সব প্ল্যানে সর্বোচ্চ ১০টি ফ্রি রেসিপি; প্ল্যান আপগ্রেডে শুধু প্রিমিয়াম রেসিপির কোটা বাড়ে)
                 </span>
-                {!paidActive && freeRemainingCount === 0 && (
+                {freeRemainingCount === 0 && (
                   <button
                     type="button"
                     onClick={() => onNavigate({ page: 'pricing' })}
                     className="font-bold text-[#B92B27] hover:underline cursor-pointer"
                   >
-                    প্রো প্ল্যান কিনুন →
+                    {paidActive ? 'প্রিমিয়াম কোটা বাড়ান →' : 'প্রো প্ল্যান কিনুন →'}
                   </button>
                 )}
               </div>

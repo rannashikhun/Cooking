@@ -411,11 +411,11 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
         return;
       }
 
-      // 3. FREE RECIPE ACCESS FLOW (Up to 10 unique free recipes without a paid plan; unlimited with active paid plan)
+      // 3. FREE RECIPE ACCESS FLOW (Strictly up to 10 unique free recipes for all non-admin users, even after plan upgrades)
       const currentFreeIds = getUserFreeUnlockedIds(user, allRecipes);
       const alreadyFreeUnlocked = currentFreeIds.includes(recipe.id);
 
-      if (!alreadyFreeUnlocked && !isPaidCurrentlyActive && currentFreeIds.length >= FREE_RECIPE_LIMIT) {
+      if (!alreadyFreeUnlocked && currentFreeIds.length >= FREE_RECIPE_LIMIT) {
         setContent(null);
         setLocked(true);
         setLockReason('quota_basic');
@@ -424,12 +424,14 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
           notifyFreeLimitReached(user.uid).then((sent) => {
             if (sent && active) {
               onToast?.(
-                'আপনার ১০টি ফ্রি রেসিপির লিমিট শেষ হয়েছে! নতুন রেসিপি দেখতে প্রো প্ল্যান কিনুন।'
+                'আপনার ১০টি ফ্রি রেসিপির লিমিট শেষ হয়েছে! নতুন প্রিমিয়াম রেসিপি দেখতে প্ল্যান কিনুন বা আপগ্রেড করুন।'
               );
             }
           });
         } else {
-          onToast?.('আপনার ১০টি ফ্রি রেসিপির লিমিট শেষ হয়েছে! নতুন রেসিপি দেখতে প্রো প্ল্যান কিনুন।');
+          onToast?.(
+            'আপনার ১০টি ফ্রি রেসিপির লিমিট শেষ হয়েছে! নতুন প্রিমিয়াম রেসিপি দেখতে প্রো প্ল্যান কিনুন।'
+          );
         }
         return;
       }
@@ -446,11 +448,11 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
           onFreeRecipeUnlocked?.(updatedFreeIds);
           onRecipeUnlocked?.(updatedFreeIds);
 
-          if (!isPaidCurrentlyActive && updatedFreeIds.length >= FREE_RECIPE_LIMIT) {
+          if (updatedFreeIds.length >= FREE_RECIPE_LIMIT) {
             notifyFreeLimitReached(user.uid).then((sent) => {
               if (sent && active) {
                 onToast?.(
-                  'আপনার ১০টি ফ্রি রেসিপির লিমিট পূর্ণ হয়েছে। আরও নতুন রেসিপি দেখতে প্রো প্ল্যান কিনুন।'
+                  'আপনার ১০টি ফ্রি রেসিপির লিমিট পূর্ণ হয়েছে। (প্ল্যান আপগ্রেড করলে শুধু প্রিমিয়াম রেসিপির কোটা বাড়ে।)'
                 );
               }
             });
@@ -460,7 +462,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
           if (active) setGuestTick((t) => t + 1);
           if (nextGuestIds.length >= FREE_RECIPE_LIMIT) {
             onToast?.(
-              'আপনার ১০টি ফ্রি রেসিপির লিমিট পূর্ণ হয়েছে। আরও নতুন রেসিপি দেখতে প্রো প্ল্যান কিনুন।'
+              'আপনার ১০টি ফ্রি রেসিপির লিমিট পূর্ণ হয়েছে। আরও প্রিমিয়াম রেসিপি দেখতে প্রো প্ল্যান কিনুন।'
             );
           }
         }
@@ -893,22 +895,24 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
                       </span>
                     )}
                   </>
-                ) : paidActive ? (
-                  <span>
-                    সক্রিয় প্ল্যান:{' '}
-                    <strong className="text-[#1B4D24]">ফ্রি রেসিপি আনলিমিটেড</strong> · প্রিমিয়াম বাকি{' '}
-                    <strong className="text-[#B92B27] tabular-nums">
-                      {toBengaliDigits(remainingNewPremium)}টি
-                    </strong>
-                  </span>
                 ) : (
                   <span>
                     ফ্রি রেসিপি কোটা:{' '}
                     <strong className="text-[#1B4D24] tabular-nums">
                       {toBengaliDigits(Math.min(freeUnlockedIds.length, FREE_RECIPE_LIMIT))} /{' '}
-                      {toBengaliDigits(FREE_RECIPE_LIMIT)}টি রেসিপি
+                      {toBengaliDigits(FREE_RECIPE_LIMIT)}টি
                     </strong>{' '}
-                    দেখা হয়েছে (একই রেসিপি বারবার দেখলেও ১ বারই গণনা হয়)
+                    দেখা হয়েছে
+                    {paidActive ? (
+                      <>
+                        {' '}· প্রিমিয়াম বাকি{' '}
+                        <strong className="text-[#B92B27] tabular-nums">
+                          {toBengaliDigits(remainingNewPremium)}টি
+                        </strong>
+                      </>
+                    ) : (
+                      ' (একই রেসিপি বারবার দেখলেও ১ বারই গণনা হয়)'
+                    )}
                   </span>
                 )}
               </div>
@@ -945,13 +949,25 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
               </h2>
               <p className="text-sm text-[#5A5044] max-w-md mx-auto leading-relaxed">
                 {lockReason === 'quota_basic'
-                  ? 'ফ্রি ইউজাররা সর্বোচ্চ ১০টি ফ্রি রেসিপি বিনামূল্যে দেখতে পারবেন। ১০টির বেশি নতুন রেসিপি দেখতে অনুগ্রহ করে ১ মাসের স্ট্যান্ডার্ড বা প্রো প্ল্যান কিনুন।'
+                  ? 'প্রতিটি অ্যাকাউন্ট থেকে সর্বোচ্চ ১০টি ফ্রি রেসিপি দেখা যায় (আগে দেখা ফ্রি রেসিপিগুলো সবসময় খোলা থাকবে)। প্ল্যান আপগ্রেড করলে শুধু প্রিমিয়াম রেসিপির কোটা বৃদ্ধি পায়—নতুন প্রিমিয়াম রেসিপি দেখতে স্ট্যান্ডার্ড বা প্রো প্ল্যান বেছে নিন।'
                   : lockReason === 'quota_paid'
                     ? 'আপনার কেনা প্ল্যানের নির্ধারিত সব প্রিমিয়াম রেসিপি দেখা হয়ে গেছে। আরও নতুন প্রিমিয়াম রেসিপি আনলক করতে একাধিকবার প্ল্যান আপগ্রেড করতে পারবেন। আগে দেখা প্রিমিয়াম রেসিপিগুলো আপনার প্রোফাইলে সবসময় আনলক থাকবে!'
                     : lockReason === 'plan_expired'
                       ? 'আপনার ১ মাসের প্ল্যানের মেয়াদ শেষ হয়ে গেছে। নতুন প্রিমিয়াম রেসিপি আনলক করতে প্ল্যান রিনিউ করুন। তবে আগে দেখা প্রিমিয়াম রেসিপিগুলো সবসময় আনলক থাকবে।'
                       : 'এই প্রিমিয়াম রেসিপিটি আনলক করতে স্ট্যান্ডার্ড বা প্রো প্ল্যান নিন। একবার যে প্রিমিয়াম রেসিপি দেখবেন সেটি ১ মাসের মেয়াদ শেষ হলেও আপনার জন্য সবসময় আনলক থাকবে!'}
               </p>
+
+              {lockReason === 'quota_basic' && paidActive && remainingNewPremium > 0 && (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => onNavigate({ page: 'recipes' })}
+                    className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#1B4D24] hover:bg-[#143A1B] text-white text-xs sm:text-sm font-bold cursor-pointer transition-colors"
+                  >
+                    আপনার বাকি {toBengaliDigits(remainingNewPremium)}টি প্রিমিয়াম রেসিপি দেখুন →
+                  </button>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 max-w-lg mx-auto">
                 {paidPlans.map((plan) => (

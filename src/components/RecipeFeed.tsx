@@ -128,10 +128,7 @@ export const RecipeFeed: React.FC<RecipeFeedProps> = ({
       return { isBlocked: false, isPermUnlocked: false, ctaLabel: 'বিস্তারিত দেখুন' };
     }
 
-    // Free recipe
-    if (hasActiveSubscription) {
-      return { isBlocked: false, isPermUnlocked: false, ctaLabel: 'রেসিপি দেখুন' };
-    }
+    // Free recipe (strictly capped at freeQuotaLimit = 10 for all non-admin users, regardless of paid plan)
     if (freeUnlockedIds !== undefined) {
       if (freeUnlockedIds.includes(recipe.id)) {
         return { isBlocked: false, isPermUnlocked: false, ctaLabel: 'রেসিপি দেখুন' };
