@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { BookOpen, Heart, Home, User as UserIcon } from 'lucide-react';
+import { BookOpen, Crown, Heart, Home, User as UserIcon } from 'lucide-react';
 import {
   getCategoryInterestClicks,
   getRecipeInterestSignals,
@@ -187,9 +187,17 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     label: string;
     icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
     isActive: boolean;
+    accentIcon?: boolean;
   }> = [
     { id: 'home', label: 'হোম', icon: Home, isActive: activeTab === 'home' },
     { id: 'recipes', label: 'রেসিপি', icon: BookOpen, isActive: activeTab === 'recipes' },
+    {
+      id: 'pricing',
+      label: 'মেম্বারশিপ',
+      icon: Crown,
+      isActive: activeTab === 'pricing',
+      accentIcon: true,
+    },
     { id: 'favorites', label: 'প্রিয়', icon: Heart, isActive: activeTab === 'favorites' },
     {
       id: 'profile',
@@ -258,8 +266,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         )}
       </AnimatePresence>
 
-      {/* 4-Tab Thumb Navigation Bar */}
-      <nav className="grid grid-cols-4 h-12 items-center" aria-label="মোবাইল ন্যাভিগেশন">
+      {/* 5-Tab Thumb Navigation Bar */}
+      <nav className="grid grid-cols-5 h-12 items-center" aria-label="মোবাইল ন্যাভিগেশন">
         {navTabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -267,7 +275,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               key={tab.id}
               type="button"
               onClick={() => onNavigate(tab.id)}
-              className={`relative flex flex-col items-center justify-center h-full gap-0.5 transition-colors duration-150 active:scale-92 ${
+              className={`relative flex flex-col items-center justify-center h-full gap-0.5 px-0.5 transition-colors duration-150 active:scale-92 cursor-pointer ${
                 tab.isActive ? 'text-[#1B4D24] font-bold' : 'text-gray-500'
               }`}
             >
@@ -278,8 +286,13 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                   className="absolute top-0 w-7 h-[2.5px] rounded-b-full bg-[#1B4D24]"
                 />
               )}
-              <Icon className="w-5 h-5 transition-transform duration-150" strokeWidth={tab.isActive ? 2.4 : 1.8} />
-              <span className="text-[11px] leading-none">{tab.label}</span>
+              <Icon
+                className={`w-5 h-5 transition-transform duration-150 ${
+                  !tab.isActive && tab.accentIcon ? 'text-[#C69214]' : ''
+                }`}
+                strokeWidth={tab.isActive ? 2.4 : 1.8}
+              />
+              <span className="text-[10.5px] leading-none whitespace-nowrap">{tab.label}</span>
             </button>
           );
         })}
