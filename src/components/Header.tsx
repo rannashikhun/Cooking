@@ -820,14 +820,14 @@ export const Header: React.FC<HeaderProps> = ({
                           if (paidActive) {
                             const planLabel =
                               user.subscriptionPlan === 'pro' ? 'প্রো প্ল্যান' : 'স্ট্যান্ডার্ড প্ল্যান';
-                            return `${planLabel} · প্রিমিয়াম: ${toBengaliDigits(premUsed)}/${toBengaliDigits(premTotal)} · ফ্রি: ${toBengaliDigits(freeUsed)}/${toBengaliDigits(freeQuotaLimit)}`;
+                            return `${planLabel} · কোটা: ${toBengaliDigits(premUsed)}/${toBengaliDigits(premTotal)} টি`;
                           }
                           if (user.subscriptionPlan === 'pro' || user.subscriptionPlan === 'standard') {
                             const planLabel =
                               user.subscriptionPlan === 'pro'
-                                ? 'প্রো (মেয়াদ শেষ)'
-                                : 'স্ট্যান্ডার্ড (মেয়াদ শেষ)';
-                            return `${planLabel} · ফ্রি কোটা: ${toBengaliDigits(freeUsed)}/${toBengaliDigits(freeQuotaLimit)} টি`;
+                                ? 'প্রো প্ল্যান (মেয়াদ শেষ)'
+                                : 'স্ট্যান্ডার্ড প্ল্যান (মেয়াদ শেষ)';
+                            return `${planLabel} · কোটা: ${toBengaliDigits(premUsed)}/${toBengaliDigits(premTotal)} টি`;
                           }
                           return `বেসিক (ফ্রি) · কোটা: ${toBengaliDigits(freeUsed)}/${toBengaliDigits(freeQuotaLimit)} টি`;
                         })()}
