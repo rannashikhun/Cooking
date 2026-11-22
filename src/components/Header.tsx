@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertTriangle,
   Bell,
@@ -164,6 +165,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifContainerRef = useRef<HTMLDivElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -177,6 +179,28 @@ export const Header: React.FC<HeaderProps> = ({
     document.addEventListener('mousedown', handleOutside);
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [notifOpen]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (!mobileSearchOpen) return;
+    const timer = window.setTimeout(() => {
+      mobileSearchInputRef.current?.focus();
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [mobileSearchOpen]);
 
   const handleMobileNav = (tab: ActiveTab) => {
     onNavigate(tab);
@@ -342,26 +366,35 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-0.5">
             <button
               type="button"
-              onClick={() => setMobileMenuOpen(true)}
+              onClick={() => {
+                setNotifOpen(false);
+                setMobileSearchOpen(false);
+                setMobileMenuOpen(true);
+              }}
               aria-label="মেনু খুলুন"
-              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-[#1A1A1A] rounded-lg active:bg-gray-100"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-[#1A1A1A] rounded-lg active:bg-gray-100 active:scale-92 transition-transform duration-150"
             >
               <Menu className="w-6 h-6" />
             </button>
             <button
               type="button"
-              onClick={() => setMobileSearchOpen((prev) => !prev)}
+              onClick={() => {
+                setNotifOpen(false);
+                setMobileSearchOpen((prev) => !prev);
+              }}
               aria-label="খুঁজুন"
-              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-[#1A1A1A] rounded-lg active:bg-gray-100"
+              className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg active:bg-gray-100 active:scale-92 transition-all duration-150 ${
+                mobileSearchOpen ? 'text-[#1B4D24] bg-[#1B4D24]/8' : 'text-[#1A1A1A]'
+              }`}
             >
-              <Search className="w-5 h-5" />
+              {mobileSearchOpen ? <X className="w-5 h-5" /> : <Search className="w-5 h-5" />}
             </button>
           </div>
 
           <button
             type="button"
             onClick={() => onNavigate('home')}
-            className="flex items-center justify-center"
+            className="flex items-center justify-center active:scale-97 transition-transform duration-150"
           >
             <BrandMark siteName={siteName} compact />
           </button>
@@ -370,9 +403,14 @@ export const Header: React.FC<HeaderProps> = ({
             {user && (
               <button
                 type="button"
-                onClick={() => setNotifOpen((prev) => !prev)}
+                onClick={() => {
+                  setMobileSearchOpen(false);
+                  setNotifOpen((prev) => !prev);
+                }}
                 aria-label="নোটিফিকেশন"
-                className="relative min-w-[40px] min-h-[44px] flex items-center justify-center text-[#1A1A1A] rounded-lg active:bg-gray-100"
+                className={`relative min-w-[40px] min-h-[44px] flex items-center justify-center rounded-lg active:bg-gray-100 active:scale-92 transition-all duration-150 ${
+                  notifOpen ? 'text-[#1B4D24] bg-[#1B4D24]/8' : 'text-[#1A1A1A]'
+                }`}
               >
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
@@ -387,7 +425,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => (user ? onNavigate('profile') : onOpenAuth())}
               aria-label="প্রোফাইল"
-              className="min-w-[40px] min-h-[44px] flex items-center justify-center text-[#1A1A1A] rounded-lg active:bg-gray-100"
+              className="min-w-[40px] min-h-[44px] flex items-center justify-center text-[#1A1A1A] rounded-lg active:bg-gray-100 active:scale-92 transition-transform duration-150"
             >
               {user?.photoURL ? (
                 <img
@@ -406,11 +444,16 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Notifications Popover Dropdown (Desktop & Mobile) */}
-        {notifOpen && user && (
-          <div
-            ref={notifContainerRef}
-            className="fixed md:absolute top-13 md:top-[74px] right-2 sm:right-6 left-2 sm:left-auto sm:w-96 z-50 bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden"
-          >
+        <AnimatePresence>
+          {notifOpen && user && (
+            <motion.div
+              ref={notifContainerRef}
+              initial={{ opacity: 0, y: -8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.98 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed md:absolute top-13 md:top-[74px] right-2 sm:right-6 left-2 sm:left-auto sm:w-96 z-50 bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden origin-top-right"
+            >
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2 bg-[#FAFAF8]">
               <div className="flex items-center gap-2">
                 <Bell className="w-4 h-4 text-[#1B4D24]" />
@@ -516,48 +559,71 @@ export const Header: React.FC<HeaderProps> = ({
                 প্রোফাইলে সকল নোটিফিকেশন দেখুন →
               </button>
             </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Mobile Expandable Search Bar */}
-        {mobileSearchOpen && (
-          <div className="md:hidden px-3 pb-3 border-t border-gray-100 bg-white">
-            <div className="relative mt-2">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => {
-                  onSearchChange(e.target.value);
-                  if (activeTab !== 'home' && activeTab !== 'recipes') {
-                    onNavigate('recipes');
-                  }
-                }}
-                placeholder="রেসিপি খুঁজুন (যেমন: বিরিয়ানি, ইলিশ)..."
-                className="w-full pl-10 pr-9 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#1B4D24]"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => onSearchChange('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 p-1"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+        <AnimatePresence initial={false}>
+          {mobileSearchOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="md:hidden overflow-hidden border-t border-gray-100 bg-white"
+            >
+              <div className="px-3 pb-3">
+                <div className="relative mt-2">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    ref={mobileSearchInputRef}
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      onSearchChange(e.target.value);
+                      if (activeTab !== 'home' && activeTab !== 'recipes') {
+                        onNavigate('recipes');
+                      }
+                    }}
+                    placeholder="রেসিপি খুঁজুন (যেমন: বিরিয়ানি, ইলিশ)..."
+                    className="w-full pl-10 pr-9 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#1B4D24] transition-colors"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => onSearchChange('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 p-1"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* Mobile Drawer Navigation */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
-          <div
-            className="fixed inset-0 bg-black/45 backdrop-blur-xs"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-          <aside className="relative w-72 max-w-[82vw] bg-white h-full shadow-2xl flex flex-col justify-between p-5 z-10 overflow-y-auto">
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden flex">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed inset-0 bg-black/45 backdrop-blur-xs"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <motion.aside
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+              className="relative w-72 max-w-[82vw] bg-white h-full shadow-2xl flex flex-col justify-between p-5 z-10 overflow-y-auto will-change-transform"
+            >
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <BrandMark siteName={siteName} compact />
@@ -565,7 +631,7 @@ export const Header: React.FC<HeaderProps> = ({
                   type="button"
                   onClick={() => setMobileMenuOpen(false)}
                   aria-label="মেনু বন্ধ করুন"
-                  className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-gray-100"
+                  className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-gray-100 active:scale-90 transition-transform duration-150"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -584,7 +650,7 @@ export const Header: React.FC<HeaderProps> = ({
                         key={item.id}
                         type="button"
                         onClick={() => handleMobileNav(item.id)}
-                        className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl border text-left transition-all ${
+                        className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl border text-left transition-all duration-150 active:scale-[0.98] ${
                           isActive
                             ? 'border-[#1B4D24]/30 bg-[#F3F8F4] text-[#1B4D24]'
                             : 'border-gray-100 bg-[#FAFAF8]/70 hover:bg-[#FAFAF8] hover:border-gray-200 text-[#1A1A1A]'
@@ -672,7 +738,7 @@ export const Header: React.FC<HeaderProps> = ({
                               setMobileMenuOpen(false);
                               onSelectCategory?.(cat.name);
                             }}
-                            className={`flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border text-center transition-all cursor-pointer ${
+                            className={`flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border text-center transition-all duration-150 active:scale-[0.97] cursor-pointer ${
                               isSelected
                                 ? 'bg-[#FDF2F0] border-[#B92B27]/45 ring-1 ring-[#B92B27]/20 shadow-2xs'
                                 : 'bg-[#FAF8F5] hover:bg-[#FDF4F1] border-gray-100 hover:border-[#E8C6BD]'
@@ -695,7 +761,9 @@ export const Header: React.FC<HeaderProps> = ({
                             <div className="w-full min-w-0">
                               <p
                                 className={`text-[12.5px] leading-snug break-words ${
-                                  isSelected ? 'font-bold text-[#B92B27]' : 'font-bold text-[#1A1A1A]'
+                                  isSelected
+                                    ? 'font-semibold text-[#B92B27]'
+                                    : 'font-medium text-[#1A1A1A]'
                                 }`}
                               >
                                 {cat.name}
@@ -716,7 +784,7 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            <div className="pt-4 border-t border-gray-100">
+            <div className="mt-6 pt-5 border-t border-gray-100">
               {user ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2.5 px-2">
@@ -779,21 +847,22 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onOpenAuth();
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-[#1B4D24] text-white text-sm font-semibold"
-                >
-                  লগইন / নিবন্ধন করুন
-                </button>
-              )}
-            </div>
-          </aside>
-        </div>
-      )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenAuth();
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-[#1B4D24] text-white text-sm font-semibold active:scale-[0.98] transition-transform duration-150"
+                  >
+                    লগইন / নিবন্ধন করুন
+                  </button>
+                )}
+              </div>
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 };

@@ -407,6 +407,69 @@
   animation: rs-page-prev 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Smooth Minimal Mobile Transitions (compositor-only, ending at transform: none) */
+@keyframes rs-mobile-tab-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rs-mobile-push-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(18px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rs-mobile-back-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(-14px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rs-toast-drop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-toast-drop {
+  animation: rs-toast-drop 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (max-width: 767px) {
+  .mobile-route-tab {
+    animation: rs-mobile-tab-in 0.23s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .mobile-route-push {
+    animation: rs-mobile-push-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .mobile-route-back {
+    animation: rs-mobile-back-in 0.23s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

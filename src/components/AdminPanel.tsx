@@ -1758,7 +1758,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">শেফের টিপস</label>
                     <textarea
-                      rows={expandedEditor === 'recipe' ? 3 : 1}
+                      rows={expandedEditor === 'recipe' ? 3 : 2}
                       value={rChefTip}
                       onChange={(e) => setRChefTip(e.target.value)}
                       placeholder="বিশেষ কোনো রান্নার কৌশল..."

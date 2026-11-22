@@ -8,6 +8,7 @@ import { BrandMark } from './components/BrandMark';
 import { CategoryStrip } from './components/CategoryIcon';
 import { CategoryPage } from './components/CategoryPage';
 import { CheckoutPage } from './components/CheckoutPage';
+import { EditProfilePage } from './components/EditProfilePage';
 import { Header } from './components/Header';
 import { HeroCarousel } from './components/HeroCarousel';
 import { MobileBottomNav } from './components/MobileBottomNav';
@@ -96,6 +97,7 @@ function parsePathToRoute(pathname: string): PageRoute {
   if (clean === '/favorites') return { page: 'favorites' };
   if (clean === '/login') return { page: 'login' };
   if (clean === '/profile') return { page: 'profile' };
+  if (clean === '/profile/edit') return { page: 'edit-profile' };
   if (clean === '/admin') return { page: 'admin' };
   return { page: 'home' };
 }
@@ -130,6 +132,8 @@ function routeToPath(route: PageRoute): string {
       return '/login';
     case 'profile':
       return '/profile';
+    case 'edit-profile':
+      return '/profile/edit';
     case 'admin':
       return '/admin';
   }
@@ -159,14 +163,38 @@ function routeToActiveTab(route: PageRoute): ActiveTab {
     case 'login':
       return 'login';
     case 'profile':
+    case 'edit-profile':
       return 'profile';
     case 'admin':
       return 'admin';
   }
 }
 
+type MobileNavDirection = 'none' | 'tab' | 'push' | 'back';
+
+const DETAIL_ROUTE_PAGES = new Set<PageRoute['page']>([
+  'recipe-detail',
+  'category',
+  'tip-detail',
+  'blog-detail',
+  'edit-profile',
+  'checkout',
+]);
+
+function resolveMobileNavDirection(prev: PageRoute, next: PageRoute): MobileNavDirection {
+  const prevIsDetail = DETAIL_ROUTE_PAGES.has(prev.page);
+  const nextIsDetail = DETAIL_ROUTE_PAGES.has(next.page);
+
+  if (next.page === 'recipe-detail') return 'push';
+  if (prev.page === 'recipe-detail' && next.page === 'category') return 'back';
+  if (nextIsDetail) return 'push';
+  if (prevIsDetail && !nextIsDetail) return 'back';
+  return 'tab';
+}
+
 export default function App() {
   const [route, setRoute] = useState<PageRoute>(() => parsePathToRoute(window.location.pathname));
+  const [mobileNavDir, setMobileNavDir] = useState<MobileNavDirection>('none');
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
@@ -293,8 +321,10 @@ export default function App() {
     if (window.location.pathname !== targetPath) {
       window.history.pushState({}, '', targetPath);
     }
+    setMobileNavDir(resolveMobileNavDirection(route, nextRoute));
     setRoute(nextRoute);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const isMobileViewport = window.matchMedia('(max-width: 767px)').matches;
+    window.scrollTo({ top: 0, behavior: isMobileViewport ? 'auto' : 'smooth' });
 
     // Background live sync from server + version check on navigation
     Promise.allSettled([
@@ -342,7 +372,11 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const finishProgress = startRouteProgress();
+      setMobileNavDir('back');
       setRoute(parsePathToRoute(window.location.pathname));
+      if (window.matchMedia('(max-width: 767px)').matches) {
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      }
       syncCatalogFromServer(false).finally(() => finishProgress());
     };
     window.addEventListener('popstate', handlePopState);
@@ -708,13 +742,25 @@ export default function App() {
       />
 
       {toastMsg && (
-        <div className="fixed top-20 right-4 z-50 max-w-sm px-4 py-3 rounded-2xl bg-[#1B4D24] text-white text-sm font-semibold shadow-xl flex items-center gap-2">
+        <div className="fixed top-16 md:top-20 right-3 md:right-4 left-3 md:left-auto z-50 md:max-w-sm px-4 py-3 rounded-2xl bg-[#1B4D24] text-white text-sm font-semibold shadow-xl flex items-center gap-2 animate-toast-drop">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{toastMsg}</span>
         </div>
       )}
 
-      <main className="flex-1">
+      <main className="flex-1 overflow-x-clip">
+        <div
+          key={routeToPath(route)}
+          className={
+            mobileNavDir === 'push'
+              ? 'mobile-route-push'
+              : mobileNavDir === 'back'
+                ? 'mobile-route-back'
+                : mobileNavDir === 'tab'
+                  ? 'mobile-route-tab'
+                  : undefined
+          }
+        >
         {/* PAGE 1: HOME PAGE */}
         {route.page === 'home' && (
           <>
@@ -1079,6 +1125,26 @@ export default function App() {
           )
         )}
 
+        {/* PAGE 13B: EDIT PROFILE PAGE */}
+        {route.page === 'edit-profile' && (
+          !authReady ? (
+            <div className="min-h-[50vh] flex items-center justify-center px-4">
+              <div className="w-8 h-8 rounded-full border-2 border-[#1B4D24]/20 border-t-[#1B4D24] animate-spin" />
+            </div>
+          ) : (
+            <EditProfilePage
+              user={user}
+              siteSettings={siteSettings}
+              onNavigate={navigate}
+              onProfileUpdated={(patch) =>
+                setUser((prev) => (prev ? { ...prev, ...patch } : prev))
+              }
+              onLogout={handleLogout}
+              onToast={showToast}
+            />
+          )
+        )}
+
         {/* PAGE 14: ADMIN PANEL PAGE */}
         {route.page === 'admin' && (
           !authReady ? (
@@ -1104,6 +1170,7 @@ export default function App() {
             />
           )
         )}
+        </div>
       </main>
 
       {/* Desktop Quiet Footer */}

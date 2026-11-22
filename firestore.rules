@@ -172,7 +172,7 @@ service cloud.firestore {
           'subscriptionStatus', 'favoriteRecipeIds', 'createdAt', 'updatedAt'
         ]) &&
         data.keys().hasOnly([
-          'uid', 'displayName', 'email', 'phoneNumber', 'photoURL', 'role', 'subscriptionPlan',
+          'uid', 'displayName', 'email', 'phoneNumber', 'photoURL', 'address', 'age', 'role', 'subscriptionPlan',
           'subscriptionStatus', 'subscriptionExpiresAt', 'lastOrderId',
           'favoriteRecipeIds', 'unlockedRecipeIds', 'freeUnlockedRecipeIds',
           'premiumUnlockedRecipeIds', 'premiumRecipeQuota', 'viewedHistory', 'createdAt', 'updatedAt'
@@ -182,6 +182,8 @@ service cloud.firestore {
         data.email is string && data.email.size() <= 160 &&
         (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 40)) &&
         (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 160000)) &&
+        (!('address' in data) || (data.address is string && data.address.size() <= 240)) &&
+        (!('age' in data) || (data.age is int && data.age >= 1 && data.age <= 120)) &&
         data.role in ['member', 'admin'] &&
         data.subscriptionPlan in ['basic', 'standard', 'pro'] &&
         data.subscriptionStatus in ['active', 'expired'] &&
@@ -466,7 +468,7 @@ service cloud.firestore {
             isOwner(userId) &&
             incoming().role == existing().role &&
             incoming().diff(existing()).affectedKeys().hasOnly([
-              'displayName', 'photoURL', 'phoneNumber', 'favoriteRecipeIds',
+              'displayName', 'photoURL', 'phoneNumber', 'address', 'age', 'favoriteRecipeIds',
               'unlockedRecipeIds', 'freeUnlockedRecipeIds', 'premiumUnlockedRecipeIds',
               'viewedHistory', 'updatedAt'
             ]) &&

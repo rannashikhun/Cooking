@@ -128,6 +128,8 @@
         "email": { "type": "string", "format": "email", "maxLength": 160 },
         "phoneNumber": { "type": "string", "maxLength": 40 },
         "photoURL": { "type": "string", "maxLength": 160000 },
+        "address": { "type": "string", "maxLength": 240 },
+        "age": { "type": "integer" },
         "role": { "type": "string", "enum": ["member", "admin"] },
         "subscriptionPlan": { "type": "string", "enum": ["basic", "standard", "pro"] },
         "subscriptionStatus": { "type": "string", "enum": ["active", "expired"] },

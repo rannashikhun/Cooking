@@ -303,7 +303,7 @@ export const RecipeFeed: React.FC<RecipeFeedProps> = ({
               {/* Image Container */}
               <div
                 onClick={() => onSelectRecipe(recipe)}
-                className="relative rounded-2xl overflow-hidden shadow-xs cursor-pointer bg-gray-100"
+                className="relative rounded-2xl overflow-hidden shadow-xs cursor-pointer bg-gray-100 transition-transform duration-150 active:scale-[0.985]"
               >
                 <img
                   src={recipe.imageUrl}
@@ -344,7 +344,7 @@ export const RecipeFeed: React.FC<RecipeFeedProps> = ({
                     onToggleFavorite(recipe.id);
                   }}
                   aria-label="প্রিয় তালিকায় রাখুন"
-                  className="absolute top-2 left-2 w-9 h-9 rounded-full bg-black/40 backdrop-blur-xs flex items-center justify-center text-white"
+                  className="absolute top-2 left-2 w-9 h-9 rounded-full bg-black/40 backdrop-blur-xs flex items-center justify-center text-white transition-transform duration-150 active:scale-85"
                 >
                   <Heart className={`w-4 h-4 ${isFav ? 'fill-[#E53935] text-[#E53935]' : 'text-white'}`} />
                 </button>
@@ -386,7 +386,7 @@ export const RecipeFeed: React.FC<RecipeFeedProps> = ({
                 <button
                   type="button"
                   onClick={() => onSelectRecipe(recipe)}
-                  className={`shrink-0 min-h-[40px] px-4 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-xs whitespace-nowrap ${
+                  className={`shrink-0 min-h-[40px] px-4 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-xs whitespace-nowrap transition-transform duration-150 active:scale-95 ${
                     isBlocked
                       ? 'bg-[#B92B27] text-white'
                       : 'bg-[#1B4D24] text-white'

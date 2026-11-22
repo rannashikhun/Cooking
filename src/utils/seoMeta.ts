@@ -185,6 +185,8 @@ function routePathForCanonical(route: PageRoute): string {
       return '/login';
     case 'profile':
       return '/profile';
+    case 'edit-profile':
+      return '/profile/edit';
     case 'admin':
       return '/admin';
   }
@@ -344,7 +346,13 @@ export function applyRouteSeoMeta(params: {
   } else if (route.page === 'contact') {
     title = `যোগাযোগ — ${siteName}`;
     ogTitle = title;
-  } else if (route.page === 'admin' || route.page === 'profile' || route.page === 'login' || route.page === 'checkout') {
+  } else if (
+    route.page === 'admin' ||
+    route.page === 'profile' ||
+    route.page === 'edit-profile' ||
+    route.page === 'login' ||
+    route.page === 'checkout'
+  ) {
     pageRobots = 'noindex, nofollow';
   }
 

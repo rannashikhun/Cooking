@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Timestamp, collection, onSnapshot, query, where } from 'firebase/firestore';
 import {
   AlertTriangle,
@@ -9,11 +10,19 @@ import {
   CheckCircle2,
   Clock,
   Crown,
+  Eye,
   Heart,
+  Image as ImageIcon,
+  Loader2,
   LogOut,
+  Mail,
+  MapPin,
   MessageSquare,
+  Pencil,
+  Phone,
   ShieldCheck,
   User as UserIcon,
+  X,
   XCircle,
 } from 'lucide-react';
 import { FONT_SIZE_OPTIONS, RECIPE_FONT_OPTIONS } from '../data/seedData';
@@ -154,6 +163,38 @@ function formatTimestampBn(ts: unknown): string {
   }
 }
 
+const BN_MONTHS_FULL = [
+  'জানুয়ারি',
+  'ফেব্রুয়ারি',
+  'মার্চ',
+  'এপ্রিল',
+  'মে',
+  'জুন',
+  'জুলাই',
+  'আগস্ট',
+  'সেপ্টেম্বর',
+  'অক্টোবর',
+  'নভেম্বর',
+  'ডিসেম্বর',
+];
+
+function formatDayMonthBn(ts: unknown): string | null {
+  try {
+    let date: Date | null = null;
+    if (typeof ts === 'number') {
+      date = new Date(ts);
+    } else if (ts instanceof Timestamp) {
+      date = ts.toDate();
+    } else if (ts && typeof (ts as { toDate?: () => Date }).toDate === 'function') {
+      date = (ts as { toDate: () => Date }).toDate();
+    }
+    if (!date || Number.isNaN(date.getTime())) return null;
+    return `${toBengaliDigits(date.getDate())} ${BN_MONTHS_FULL[date.getMonth()]}`;
+  } catch {
+    return null;
+  }
+}
+
 export const ProfileView: React.FC<ProfileViewProps> = ({
   user,
   recipes,
@@ -175,7 +216,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoMsg, setPhotoMsg] = useState<string | null>(null);
   const [photoErr, setPhotoErr] = useState<string | null>(null);
+  const [showPhotoMenu, setShowPhotoMenu] = useState(false);
+  const [showPhotoViewer, setShowPhotoViewer] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowPhotoMenu(false);
+        setShowPhotoViewer(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -204,10 +258,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setUploadingPhoto(true);
     try {
       const dataUrl = await compressImageFileToDataUrl(file, {
-        maxWidth: 320,
-        maxHeight: 320,
-        quality: 0.78,
-        maxChars: 140000,
+        maxWidth: 360,
+        maxHeight: 360,
+        quality: 0.82,
+        maxChars: 135000,
+        squareCrop: true,
       });
       await updateUserProfilePhoto(user.uid, dataUrl);
       onPhotoUpdated?.(dataUrl);
@@ -348,31 +403,37 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
-      <div className="bg-white rounded-3xl border border-gray-200 p-6 sm:p-8 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
+      <div className="bg-white rounded-3xl border border-gray-200 p-5 sm:p-8 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 sm:gap-6">
+          <div className="flex items-start gap-4">
             <div className="relative shrink-0">
-              {user.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt={user.displayName}
-                  referrerPolicy="no-referrer"
-                  className="w-18 h-18 rounded-full object-cover border-2 border-[#1B4D24]/20"
-                />
-              ) : (
-                <div className="w-18 h-18 rounded-full bg-[#1B4D24] text-white flex items-center justify-center text-2xl font-bold">
-                  {user.displayName.charAt(0)}
-                </div>
-              )}
-
               <button
                 type="button"
                 disabled={uploadingPhoto}
-                onClick={() => fileInputRef.current?.click()}
-                aria-label="গ্যালারি থেকে প্রোফাইল ছবি দিন"
-                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-[#1B4D24] hover:bg-gray-50 cursor-pointer disabled:opacity-60"
+                onClick={() => setShowPhotoMenu(true)}
+                aria-label="প্রোফাইল পিক অপশন খুলুন"
+                className="relative block rounded-full focus:outline-none focus:ring-2 focus:ring-[#1B4D24]/35 cursor-pointer group disabled:opacity-60"
               >
-                <Camera className="w-3.5 h-3.5" />
+                {user.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName}
+                    referrerPolicy="no-referrer"
+                    className="w-18 h-18 rounded-full object-cover border-2 border-[#1B4D24]/20 group-hover:opacity-90 transition-opacity"
+                  />
+                ) : (
+                  <div className="w-18 h-18 rounded-full bg-[#1B4D24] text-white flex items-center justify-center text-2xl font-bold group-hover:opacity-90 transition-opacity">
+                    {user.displayName.charAt(0)}
+                  </div>
+                )}
+
+                <span className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-[#1B4D24] group-hover:bg-gray-50">
+                  {uploadingPhoto ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="w-3.5 h-3.5" />
+                  )}
+                </span>
               </button>
 
               <input
@@ -384,17 +445,34 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               />
             </div>
 
-            <div>
-              <h1 className="text-xl font-bold text-[#1A1A1A]">{user.displayName}</h1>
-              <p className="text-sm text-gray-500">{displayContact}</p>
-              <button
-                type="button"
-                disabled={uploadingPhoto}
-                onClick={() => fileInputRef.current?.click()}
-                className="mt-1 text-xs font-bold text-[#1B4D24] hover:underline cursor-pointer disabled:opacity-60"
-              >
-                {uploadingPhoto ? 'ছবি আপলোড হচ্ছে...' : 'গ্যালারি থেকে প্রোফাইল ছবি সেট করুন'}
-              </button>
+            <div className="min-w-0 pt-2.5 sm:pt-2">
+              <h1 className="text-xl font-bold text-[#1A1A1A] leading-snug">{user.displayName}</h1>
+              {displayContact && (
+                <p className="font-numeral-bn text-[11px] sm:text-xs text-gray-500 mt-0.5 inline-flex items-center gap-1 break-all">
+                  {displayContact.includes('@') ? (
+                    <Mail className="w-3 h-3 text-[#1B4D24] shrink-0" />
+                  ) : (
+                    <Phone className="w-3 h-3 text-[#1B4D24] shrink-0" />
+                  )}
+                  <span>{displayContact}</span>
+                </p>
+              )}
+              {(user.address || user.age) && (
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
+                  {user.age && (
+                    <span className="font-numeral-bn">
+                      বয়স: {toBengaliDigits(user.age)} বছর
+                    </span>
+                  )}
+                  {user.age && user.address && <span aria-hidden="true">·</span>}
+                  {user.address && (
+                    <span className="inline-flex items-center gap-0.5">
+                      <MapPin className="w-3 h-3 text-[#1B4D24] shrink-0" />
+                      <span>{user.address}</span>
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-semibold">
                 <span className="inline-flex items-center gap-1 text-[#1B4D24]">
                   <Crown className="w-3.5 h-3.5 text-[#D4A017]" />
@@ -423,32 +501,43 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
             {user.role === 'admin' && (
               <button
                 type="button"
                 onClick={() => onNavigate({ page: 'admin' })}
-                className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-[#1B4D24] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#1B4D24] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
               >
-                <ShieldCheck className="w-4 h-4" />
+                <ShieldCheck className="w-4 h-4 shrink-0" />
                 এডমিন প্যানেল
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => onNavigate({ page: 'pricing' })}
-              className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl border border-[#D4A017] text-[#9A7209] hover:bg-[#FFFBEB] text-xs font-bold cursor-pointer"
-            >
-              প্ল্যান আপগ্রেড
-            </button>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-xs font-semibold text-gray-700 inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              লগআউট
-            </button>
+            <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2.5 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => onNavigate({ page: 'pricing' })}
+                className="flex-auto sm:flex-initial px-2 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-[#D4A017] text-[#9A7209] hover:bg-[#FFFBEB] text-[11px] sm:text-xs font-bold inline-flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap cursor-pointer transition-colors"
+              >
+                <Crown className="w-3.5 h-3.5 text-[#D4A017] shrink-0" />
+                <span>প্ল্যান আপগ্রেড</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate({ page: 'edit-profile' })}
+                className="flex-auto sm:flex-initial px-2 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-[#1B4D24]/35 text-[#1B4D24] hover:bg-[#EEF6EF] text-[11px] sm:text-xs font-bold inline-flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap cursor-pointer transition-colors"
+              >
+                <Pencil className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                <span>প্রোফাইল এডিট</span>
+              </button>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="flex-auto sm:flex-initial px-2 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-[11px] sm:text-xs font-semibold text-gray-700 inline-flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap cursor-pointer transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5 shrink-0" />
+                <span>লগআউট</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -566,53 +655,61 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* Tabbed Free Recipes, Permanently Unlocked Premium Recipes & Favorite Recipes */}
-      <div className="bg-white rounded-3xl border border-gray-200 p-4 sm:p-7">
-        <div className="flex flex-nowrap items-center justify-center md:justify-start gap-1.5 sm:gap-2 border-b border-gray-100 pb-4 mb-5">
+      <div
+        className={`bg-white rounded-3xl border p-4 sm:p-6 transition-colors ${
+          activeRecipeTab === 'premium'
+            ? 'border-[#C69214]/40'
+            : activeRecipeTab === 'favorites'
+              ? 'border-[#B92B27]/30'
+              : 'border-[#1B4D24]/25'
+        }`}
+      >
+        <div className="flex flex-nowrap items-stretch w-full gap-1.5 p-1 rounded-xl bg-[#F5F4F0] border border-gray-200/70 mb-4">
           <button
             type="button"
             onClick={() => setActiveRecipeTab('free')}
-            className={`inline-flex items-center justify-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-sm font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+            className={`flex-auto inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-4 py-2 rounded-lg text-xs sm:text-[13px] font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeRecipeTab === 'free'
-                ? 'bg-[#1B4D24] text-white shadow-xs'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-[#1B4D24] text-white shadow-sm'
+                : 'bg-white/80 text-gray-700 hover:bg-white'
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <BookOpen className="w-3.5 h-3.5 shrink-0" />
             <span>ফ্রি রেসিপি ({toBengaliDigits(freeRecipeItems.length)})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveRecipeTab('premium')}
-            className={`inline-flex items-center justify-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-sm font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+            className={`flex-auto inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-4 py-2 rounded-lg text-xs sm:text-[13px] font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeRecipeTab === 'premium'
-                ? 'bg-[#C69214] text-white shadow-xs'
-                : 'bg-amber-50 text-[#9A6E04] hover:bg-amber-100/80 border border-amber-200/70'
+                ? 'bg-[#C69214] text-white shadow-sm'
+                : 'bg-amber-50/90 text-[#9A6E04] hover:bg-amber-100/70'
             }`}
           >
-            <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <Crown className="w-3.5 h-3.5 shrink-0" />
             <span>প্রিমিয়াম রেসিপি ({toBengaliDigits(premiumRecipeItems.length)})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveRecipeTab('favorites')}
-            className={`hidden md:inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-colors cursor-pointer ${
+            className={`hidden md:inline-flex flex-auto items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeRecipeTab === 'favorites'
-                ? 'bg-[#B92B27] text-white shadow-xs'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-[#B92B27] text-white shadow-sm'
+                : 'bg-white/80 text-gray-700 hover:bg-white'
             }`}
           >
-            <Heart className="w-4 h-4 shrink-0" />
+            <Heart className="w-3.5 h-3.5 shrink-0" />
             <span>প্রিয় রেসিপি ({toBengaliDigits(favoriteRecipes.length)})</span>
           </button>
         </div>
 
         {activeRecipeTab === 'free' ? (
-          <div className="space-y-4">
+          <div className="space-y-3.5">
             {user.role !== 'admin' && (
-              <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-[#F4F8F4] border border-[#DCE8DC] text-xs text-[#2D4530]">
-                <span>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-[#EEF6EF] border border-[#1B4D24]/20 text-xs text-[#1B4D24]">
+                <span className="font-medium leading-relaxed">
                   {paidActive
                     ? 'আপনার সক্রিয় প্রো/স্ট্যান্ডার্ড প্ল্যানে সব ফ্রি রেসিপি আনলিমিটেড দেখতে পারবেন।'
                     : `ফ্রি কোটা ব্যবহৃত: ${toBengaliDigits(Math.min(freeUsedCount, FREE_RECIPE_LIMIT))} / ${toBengaliDigits(FREE_RECIPE_LIMIT)} টি (একই রেসিপি বারবার দেখলেও ১ বারই গণনা হয়)`}
@@ -630,29 +727,34 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             )}
 
             {freeRecipeItems.length === 0 ? (
-              <p className="text-sm text-gray-500 py-3">
-                আপনি এখনো কোনো ফ্রি রেসিপি ওপেন করেননি। যেকোনো ফ্রি রেসিপি দেখলে তা এখানে সংরক্ষিত হবে।
-              </p>
+              <div className="rounded-2xl border border-dashed border-[#1B4D24]/25 bg-[#F7FAF7] px-4 py-6 text-center">
+                <p className="text-sm text-[#3A4D3D]">
+                  আপনি এখনো কোনো ফ্রি রেসিপি ওপেন করেননি। যেকোনো ফ্রি রেসিপি দেখলে তা এখানে সংরক্ষিত হবে।
+                </p>
+              </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {freeRecipeItems.map(({ recipe, viewedAt }) => (
                   <div
                     key={recipe.id}
                     onClick={() => onNavigate({ page: 'recipe-detail', id: recipe.id })}
-                    className="flex items-center gap-3.5 p-3 rounded-2xl border border-gray-100 hover:border-[#1B4D24]/40 cursor-pointer transition-colors"
+                    className="flex items-center gap-3.5 p-3 rounded-2xl border border-[#1B4D24]/18 bg-[#F8FBF8] hover:border-[#1B4D24]/45 hover:bg-[#F0F7F1] cursor-pointer transition-all duration-150 active:scale-[0.985]"
                   >
                     <img
                       src={recipe.imageUrl}
                       alt={recipe.title}
                       referrerPolicy="no-referrer"
-                      className="w-16 h-16 rounded-xl object-cover shrink-0"
+                      className="w-16 h-16 rounded-xl object-cover shrink-0 border border-[#1B4D24]/15"
                     />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-[#1A1A1A] truncate">{recipe.title}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {recipe.cookTime} · বিনামূল্যে
-                      </p>
-                      <p className="text-[11px] text-[#1B4D24] font-medium mt-0.5">
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#1B4D24]/10 text-[#1B4D24] text-[10px] font-bold">
+                          ফ্রি রেসিপি
+                        </span>
+                        <span className="text-xs text-gray-500">{recipe.cookTime}</span>
+                      </div>
+                      <p className="font-numeral-bn text-[11px] text-[#1B4D24] font-medium mt-1">
                         {viewedAt ? `দেখা হয়েছে: ${formatTimestampBn(viewedAt)}` : 'আনলক করা ফ্রি রেসিপি'}
                       </p>
                     </div>
@@ -662,87 +764,102 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             )}
           </div>
         ) : activeRecipeTab === 'premium' ? (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-xs text-[#6B4E08]">
-              <span>
+          <div className="space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-[#FFF8E6] border border-[#C69214]/30 text-xs text-[#7A5605]">
+              <span className="font-medium leading-relaxed">
                 যে প্রিমিয়াম রেসিপি একবার আনলক করবেন, ১ মাসের প্ল্যান শেষ হওয়ার পরও সেটি আপনার জন্য সবসময় আনলক থাকবে।
               </span>
               {user.role !== 'admin' && (
-                <span className="font-bold tabular-nums text-[#9A6E04]">
+                <span className="font-numeral-bn font-bold tabular-nums text-[#9A6E04]">
                   আনলকড: {toBengaliDigits(premiumUnlockedIds.length)} / {toBengaliDigits(premiumQuotaTotal)} টি
                 </span>
               )}
             </div>
 
             {premiumRecipeItems.length === 0 ? (
-              <div className="py-4 space-y-2.5">
-                <p className="text-sm text-gray-500">
+              <div className="rounded-2xl border border-dashed border-[#C69214]/35 bg-[#FFFDF5] px-4 py-6 text-center space-y-3">
+                <p className="text-sm text-[#6B5319]">
                   আপনি এখনো কোনো প্রিমিয়াম রেসিপি আনলক করেননি। প্রো বা স্ট্যান্ডার্ড প্ল্যান নিয়ে প্রিমিয়াম রেসিপি দেখলে তা এখানে চিরস্থায়ীভাবে সংরক্ষিত থাকবে।
                 </p>
                 <button
                   type="button"
                   onClick={() => onNavigate({ page: 'pricing' })}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#C69214] hover:bg-[#AE7F0E] text-white text-xs font-bold cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#C69214] hover:bg-[#AE7F0E] text-white text-xs font-bold cursor-pointer"
                 >
                   <Crown className="w-3.5 h-3.5" />
                   প্রো প্ল্যান দেখুন
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {premiumRecipeItems.map(({ recipe, viewedAt }) => (
-                  <div
-                    key={recipe.id}
-                    onClick={() => onNavigate({ page: 'recipe-detail', id: recipe.id })}
-                    className="flex items-center gap-3.5 p-3 rounded-2xl border border-amber-200/70 bg-amber-50/25 hover:border-amber-400 cursor-pointer transition-colors"
-                  >
-                    <img
-                      src={recipe.imageUrl}
-                      alt={recipe.title}
-                      referrerPolicy="no-referrer"
-                      className="w-16 h-16 rounded-xl object-cover shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-sm font-bold text-[#1A1A1A] truncate">{recipe.title}</p>
-                      </div>
-                      <p className="text-xs text-gray-600 mt-0.5">
-                        {recipe.cookTime} · প্রিমিয়াম
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-[#1B4D24] text-[10px] font-bold">
-                          <CheckCircle2 className="w-3 h-3" />
-                          চিরস্থায়ী আনলকড
-                        </span>
-                        {viewedAt && (
-                          <span className="text-[10px] text-gray-500">
-                            {formatTimestampBn(viewedAt)}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {premiumRecipeItems.map(({ recipe, viewedAt }) => {
+                  const seenDateLabel = viewedAt ? formatDayMonthBn(viewedAt) : null;
+                  return (
+                    <div
+                      key={recipe.id}
+                      onClick={() => onNavigate({ page: 'recipe-detail', id: recipe.id })}
+                      className="flex items-center gap-3 p-3 rounded-2xl border border-[#C69214]/35 bg-gradient-to-br from-[#FFFDF7] to-[#FFF8E6] hover:border-[#C69214]/75 hover:shadow-xs cursor-pointer transition-all duration-150 active:scale-[0.985]"
+                    >
+                      <img
+                        src={recipe.imageUrl}
+                        alt={recipe.title}
+                        referrerPolicy="no-referrer"
+                        className="w-16 h-16 rounded-xl object-cover shrink-0 ring-1 ring-[#C69214]/30"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-[#1A1A1A] truncate leading-snug">
+                          {recipe.title}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#C69214]/15 text-[#9A6E04] text-[10px] font-bold shrink-0">
+                            <Crown className="w-2.5 h-2.5 shrink-0" />
+                            প্রিমিয়াম
                           </span>
-                        )}
+                          {recipe.cookTime && (
+                            <span className="inline-flex items-center gap-1 font-numeral-bn text-[11px] font-medium text-[#6B5319]">
+                              <Clock className="w-3 h-3 text-[#B8860B] shrink-0" />
+                              <span>{recipe.cookTime}</span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 pt-1.5 border-t border-[#C69214]/15">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-[#1B4D24] text-[10px] font-bold shrink-0">
+                            <CheckCircle2 className="w-3 h-3 shrink-0" />
+                            চিরস্থায়ী আনলকড
+                          </span>
+                          {seenDateLabel && (
+                            <span className="inline-flex items-center gap-1 font-numeral-bn text-[11px] font-medium text-[#7A5A12] whitespace-nowrap">
+                              <Eye className="w-3 h-3 text-[#B8860B] shrink-0" />
+                              <span>{seenDateLabel}</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         ) : favoriteRecipes.length === 0 ? (
-          <p className="text-sm text-gray-500 py-3">
-            এখনো কোনো রেসিপি প্রিয় তালিকায় যোগ করা হয়নি। রেসিপির ছবির ওপর লাভ চিহ্নে ক্লিক করে সংরক্ষণ করুন।
-          </p>
+          <div className="rounded-2xl border border-dashed border-[#B92B27]/25 bg-[#FDF7F6] px-4 py-6 text-center">
+            <p className="text-sm text-gray-600">
+              এখনো কোনো রেসিপি প্রিয় তালিকায় যোগ করা হয়নি। রেসিপির ছবির ওপর লাভ চিহ্নে ক্লিক করে সংরক্ষণ করুন।
+            </p>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {favoriteRecipes.map((recipe) => (
               <div
                 key={recipe.id}
                 onClick={() => onNavigate({ page: 'recipe-detail', id: recipe.id })}
-                className="flex items-center gap-3.5 p-3 rounded-2xl border border-gray-100 hover:border-gray-300 cursor-pointer transition-colors"
+                className="flex items-center gap-3.5 p-3 rounded-2xl border border-[#B92B27]/18 bg-[#FDF8F7] hover:border-[#B92B27]/45 cursor-pointer transition-all"
               >
                 <img
                   src={recipe.imageUrl}
                   alt={recipe.title}
                   referrerPolicy="no-referrer"
-                  className="w-16 h-16 rounded-xl object-cover shrink-0"
+                  className="w-16 h-16 rounded-xl object-cover shrink-0 border border-[#B92B27]/15"
                 />
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-[#1A1A1A] truncate">{recipe.title}</p>
@@ -923,6 +1040,131 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Profile Picture 2-Option Action Menu (View / Change) */}
+      <AnimatePresence>
+        {showPhotoMenu && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-4"
+            onClick={() => setShowPhotoMenu(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.98 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full max-w-xs bg-white rounded-3xl p-4 shadow-2xl border border-gray-100 space-y-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sm:hidden w-9 h-1 rounded-full bg-gray-200 mx-auto mb-1" />
+              <div className="flex items-center justify-between px-2 pb-1.5 border-b border-gray-100">
+                <span className="text-xs font-bold text-gray-500">প্রোফাইল পিক</span>
+                <button
+                  type="button"
+                  onClick={() => setShowPhotoMenu(false)}
+                  aria-label="বন্ধ করুন"
+                  className="p-1 rounded-full hover:bg-gray-100 text-gray-500 cursor-pointer active:scale-90 transition-transform duration-150"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPhotoMenu(false);
+                  setShowPhotoViewer(true);
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl hover:bg-[#F5F7F5] text-left text-sm font-bold text-[#1A1A1A] transition-all duration-150 active:scale-[0.98] cursor-pointer"
+              >
+                <span className="w-9 h-9 rounded-full bg-[#1B4D24]/10 text-[#1B4D24] flex items-center justify-center shrink-0">
+                  <Eye className="w-4 h-4" />
+                </span>
+                <span>ভিউ প্রোফাইল পিক</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPhotoMenu(false);
+                  fileInputRef.current?.click();
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl hover:bg-[#F5F7F5] text-left text-sm font-bold text-[#1A1A1A] transition-all duration-150 active:scale-[0.98] cursor-pointer"
+              >
+                <span className="w-9 h-9 rounded-full bg-[#C69214]/15 text-[#9A6E04] flex items-center justify-center shrink-0">
+                  <ImageIcon className="w-4 h-4" />
+                </span>
+                <span>প্রোফাইল পিক পরিবর্তন করুন</span>
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Profile Picture Lightbox Viewer */}
+      <AnimatePresence>
+        {showPhotoViewer && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setShowPhotoViewer(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ duration: 0.21, ease: [0.22, 1, 0.36, 1] }}
+              className="relative w-full max-w-sm bg-white rounded-3xl p-5 shadow-2xl text-center space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setShowPhotoViewer(false)}
+                aria-label="বন্ধ করুন"
+                className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 cursor-pointer active:scale-90 transition-transform duration-150"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <h3 className="text-sm font-bold text-[#1A1A1A]">{user.displayName}</h3>
+
+              <div className="flex items-center justify-center py-2">
+                {user.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName}
+                    referrerPolicy="no-referrer"
+                    className="w-60 h-60 sm:w-68 sm:h-68 rounded-2xl object-cover border border-gray-200 shadow-md"
+                  />
+                ) : (
+                  <div className="w-52 h-52 rounded-full bg-[#1B4D24] text-white flex items-center justify-center text-6xl font-bold shadow-md">
+                    {user.displayName.charAt(0)}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPhotoViewer(false);
+                  fileInputRef.current?.click();
+                }}
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#1B4D24] hover:bg-[#143A1B] text-white text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform duration-150"
+              >
+                <Camera className="w-4 h-4" />
+                <span>প্রোফাইল পিক পরিবর্তন করুন</span>
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 };

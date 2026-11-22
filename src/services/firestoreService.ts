@@ -1,6 +1,7 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocFromServer,
@@ -12,8 +13,13 @@ import {
   updateDoc,
   writeBatch,
 } from 'firebase/firestore';
-import type { User } from 'firebase/auth';
-import { auth, db, handleFirestoreError, OperationType } from '../firebase';
+import {
+  reauthenticateWithPopup,
+  updatePassword,
+  updateProfile,
+  type User,
+} from 'firebase/auth';
+import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../firebase';
 import {
   SEED_BLOGS,
   SEED_CATEGORIES,
@@ -1111,6 +1117,9 @@ export async function checkAndNotifyPlanExpiry(
 }
 
 export async function updateUserProfilePhoto(uid: string, photoURL: string): Promise<void> {
+  if (!photoURL || photoURL.length > 158000) {
+    throw new Error('ছবির সাইজ অনুমোদিত সীমার চেয়ে বড়। অনুগ্রহ করে অন্য ছবি দিন।');
+  }
   try {
     await updateDoc(doc(db, 'users', uid), {
       photoURL,
@@ -1118,6 +1127,137 @@ export async function updateUserProfilePhoto(uid: string, photoURL: string): Pro
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+  }
+}
+
+export async function updateUserProfileDetails(
+  uid: string,
+  payload: {
+    displayName?: string;
+    address?: string;
+    age?: number | null;
+    photoURL?: string;
+  }
+): Promise<{
+  displayName?: string;
+  address?: string;
+  age?: number;
+  photoURL?: string;
+}> {
+  const updates: Record<string, unknown> = {
+    updatedAt: serverTimestamp(),
+  };
+  const result: {
+    displayName?: string;
+    address?: string;
+    age?: number;
+    photoURL?: string;
+  } = {};
+
+  if (payload.displayName !== undefined) {
+    const cleanName = payload.displayName.trim().slice(0, 100);
+    if (cleanName.length < 1) {
+      throw new Error('অনুগ্রহ করে আপনার সঠিক নাম লিখুন।');
+    }
+    updates.displayName = cleanName;
+    result.displayName = cleanName;
+  }
+
+  if (payload.address !== undefined) {
+    const cleanAddress = payload.address.trim().slice(0, 240);
+    if (cleanAddress.length > 0) {
+      updates.address = cleanAddress;
+      result.address = cleanAddress;
+    } else {
+      updates.address = deleteField();
+      result.address = undefined;
+    }
+  }
+
+  if (payload.age !== undefined) {
+    if (payload.age === null) {
+      updates.age = deleteField();
+      result.age = undefined;
+    } else {
+      const parsedAge = Math.round(Number(payload.age));
+      if (!Number.isFinite(parsedAge) || parsedAge < 1 || parsedAge > 120) {
+        throw new Error('বয়স ১ থেকে ১২০ এর মধ্যে লিখুন।');
+      }
+      updates.age = parsedAge;
+      result.age = parsedAge;
+    }
+  }
+
+  if (payload.photoURL !== undefined) {
+    if (!payload.photoURL || payload.photoURL.length > 158000) {
+      throw new Error('ছবির সাইজ অনুমোদিত সীমার চেয়ে বড়।');
+    }
+    updates.photoURL = payload.photoURL;
+    result.photoURL = payload.photoURL;
+  }
+
+  try {
+    await updateDoc(doc(db, 'users', uid), updates);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+  }
+
+  if (result.displayName && auth.currentUser && auth.currentUser.uid === uid) {
+    try {
+      await updateProfile(auth.currentUser, { displayName: result.displayName });
+    } catch {
+      // Non-fatal if auth profile sync fails while Firestore succeeded
+    }
+  }
+
+  return result;
+}
+
+export async function changeUserPasswordDirect(newPassword: string): Promise<void> {
+  const fbUser = auth.currentUser;
+  if (!fbUser) {
+    throw new Error('পাসওয়ার্ড পরিবর্তন করতে অনুগ্রহ করে লগইন করুন।');
+  }
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।');
+  }
+  if (newPassword.length > 128) {
+    throw new Error('পাসওয়ার্ড ১২৮ অক্ষরের বেশি হতে পারবে না।');
+  }
+
+  try {
+    await updatePassword(fbUser, newPassword);
+    return;
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code || '';
+    const hasGoogleProvider = fbUser.providerData.some((p) => p.providerId === 'google.com');
+
+    if (code === 'auth/requires-recent-login' && hasGoogleProvider) {
+      try {
+        await reauthenticateWithPopup(fbUser, googleProvider);
+        await updatePassword(fbUser, newPassword);
+        return;
+      } catch (reauthErr: unknown) {
+        const reCode = (reauthErr as { code?: string })?.code || '';
+        if (reCode === 'auth/popup-closed-by-user') {
+          throw new Error('Google পপআপ বন্ধ করা হয়েছে। আবার চেষ্টা করুন।');
+        }
+        throw new Error('পাসওয়ার্ড আপডেট করা যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন।');
+      }
+    }
+
+    if (code === 'auth/requires-recent-login') {
+      throw new Error(
+        'REQUIRES_RECENT_LOGIN'
+      );
+    }
+    if (code === 'auth/weak-password') {
+      throw new Error('পাসওয়ার্ডটি খুবই দুর্বল। অনুগ্রহ করে অন্তত ৬ অক্ষরের শক্তিশালী পাসওয়ার্ড দিন।');
+    }
+    if (code === 'auth/operation-not-allowed') {
+      throw new Error('এই প্রজেক্টে Email/Password সাইন-ইন চালু করা নেই।');
+    }
+    throw new Error('পাসওয়ার্ড পরিবর্তন করা যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন।');
   }
 }
 

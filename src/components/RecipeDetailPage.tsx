@@ -792,7 +792,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
             </h1>
 
             {recipe.subtitle && (
-              <p className="font-recipe-diary text-[17px] sm:text-[19px] text-[#453C32] leading-[1.9] max-w-2xl">
+              <p className="font-recipe-diary text-[17px] sm:text-[19px] text-[#453C32] leading-[1.9] max-w-2xl whitespace-pre-wrap break-words">
                 {recipe.subtitle}
               </p>
             )}
@@ -1092,7 +1092,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
                           </button>
                         )}
 
-                        <p className="font-recipe-diary text-[17.5px] sm:text-[19px] font-normal text-[#241E17] leading-[34px] bg-[repeating-linear-gradient(transparent,transparent_33px,#EFE8D6_34px)]">
+                        <p className="font-recipe-diary text-[17.5px] sm:text-[19px] font-normal text-[#241E17] leading-[34px] bg-[repeating-linear-gradient(transparent,transparent_33px,#EFE8D6_34px)] whitespace-pre-wrap break-words">
                           {step}
                         </p>
                       </li>
@@ -1105,7 +1105,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
               {content.chefTip && (
                 <aside className="p-5 sm:p-6 rounded-2xl bg-[#F1F6EF] border border-[#1B4D24]/20 space-y-1.5">
                   <p className="font-recipe-diary-heading text-base text-[#1B4D24]">শেফের বিশেষ টিপস</p>
-                  <p className="font-recipe-diary text-[16.5px] sm:text-[18px] text-[#241E17] leading-[1.9]">
+                  <p className="font-recipe-diary text-[16.5px] sm:text-[18px] text-[#241E17] leading-[1.9] whitespace-pre-wrap break-words">
                     {content.chefTip}
                   </p>
                 </aside>
@@ -1198,7 +1198,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
                           <span aria-hidden="true" className="text-[#B8AE9E]">·</span>
                           <span className="text-[#7A6F60]">{formatBengaliCommentDate(cmt.createdAt)}</span>
                         </div>
-                        <p className="text-sm text-[#2D2720] mt-1 leading-relaxed break-words">
+                        <p className="text-sm text-[#2D2720] mt-1 leading-relaxed whitespace-pre-wrap break-words">
                           {cmt.text}
                         </p>
                         {user && (
@@ -1311,7 +1311,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
                                     <span aria-hidden="true" className="text-[#B8AE9E]">·</span>
                                     <span className="text-[#7A6F60]">{formatBengaliCommentDate(rep.createdAt)}</span>
                                   </div>
-                                  <p className="text-sm text-[#2D2720] mt-1 leading-relaxed break-words">
+                                  <p className="text-sm text-[#2D2720] mt-1 leading-relaxed whitespace-pre-wrap break-words">
                                     {rep.text}
                                   </p>
                                   {user && (
@@ -1546,7 +1546,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
                         : 'animate-diary-fade'
                   }`}
                 >
-                  <p className="font-recipe-diary text-[16px] sm:text-[17.5px] text-[#2D2720] leading-[30px] bg-[repeating-linear-gradient(transparent,transparent_29px,#EFE8D6_30px)]">
+                  <p className="font-recipe-diary text-[16px] sm:text-[17.5px] text-[#2D2720] leading-[30px] bg-[repeating-linear-gradient(transparent,transparent_29px,#EFE8D6_30px)] whitespace-pre-wrap break-words">
                     {lightboxImage.caption}
                   </p>
                 </div>

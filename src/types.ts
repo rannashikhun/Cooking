@@ -20,6 +20,7 @@ export type PageRoute =
   | { page: 'favorites' }
   | { page: 'login' }
   | { page: 'profile' }
+  | { page: 'edit-profile' }
   | { page: 'admin' };
 
 export type ActiveTab =
@@ -136,6 +137,8 @@ export interface UserProfile {
   email: string;
   phoneNumber?: string;
   photoURL?: string;
+  address?: string;
+  age?: number;
   role: UserRole;
   subscriptionPlan: PlanTier;
   subscriptionStatus: SubscriptionStatus;
