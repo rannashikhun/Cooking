@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
@@ -83,7 +84,9 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({
   const [address, setAddress] = useState(user?.address || '');
   const [ageInput, setAgeInput] = useState(user?.age ? String(user.age) : '');
 
+  const [preparingPhoto, setPreparingPhoto] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null);
   const [photoMsg, setPhotoMsg] = useState<string | null>(null);
   const [photoErr, setPhotoErr] = useState<string | null>(null);
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
@@ -101,6 +104,7 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({
   const [needsRecentLogin, setNeedsRecentLogin] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputId = 'edit-profile-photo-input';
 
   useEffect(() => {
     if (!user) return;
@@ -114,11 +118,14 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({
       if (e.key === 'Escape') {
         setShowPhotoMenu(false);
         setShowPhotoViewer(false);
+        if (!uploadingPhoto) {
+          setPendingPhotoPreview(null);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [uploadingPhoto]);
 
   if (!user) {
     return (
@@ -145,20 +152,16 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({
 
   const displayContact = formatUserContact(user.email, user.phoneNumber);
 
-  const triggerPhotoPicker = () => {
-    setShowPhotoMenu(false);
-    setShowPhotoViewer(false);
-    fileInputRef.current?.click();
-  };
-
   const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
 
+    setShowPhotoMenu(false);
+    setShowPhotoViewer(false);
     setPhotoErr(null);
     setPhotoMsg(null);
-    setUploadingPhoto(true);
+    setPreparingPhoto(true);
     try {
       const dataUrl = await compressImageFileToDataUrl(file, {
         maxWidth: 360,
@@ -167,14 +170,31 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({
         maxChars: 135000,
         squareCrop: true,
       });
-      await updateUserProfilePhoto(user.uid, dataUrl);
-      onProfileUpdated({ photoURL: dataUrl });
-      setPhotoMsg('প্রোফাইল ছবি সফলভাবে পরিবর্তন হয়েছে!');
+      setPendingPhotoPreview(dataUrl);
+    } catch (err) {
+      setPhotoErr(
+        err instanceof Error ? err.message : 'প্রোফাইল ছবি প্রসেস করা যায়নি। অন্য ছবি চেষ্টা করুন।'
+      );
+    } finally {
+      setPreparingPhoto(false);
+    }
+  };
+
+  const handleSavePendingPhoto = async () => {
+    if (!pendingPhotoPreview) return;
+    setPhotoErr(null);
+    setPhotoMsg(null);
+    setUploadingPhoto(true);
+    try {
+      await updateUserProfilePhoto(user.uid, pendingPhotoPreview);
+      onProfileUpdated({ photoURL: pendingPhotoPreview });
+      setPendingPhotoPreview(null);
+      setPhotoMsg('প্রোফাইল ছবি সফলভাবে সেভ হয়েছে!');
       onToast?.('প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে!');
       setTimeout(() => setPhotoMsg(null), 4000);
     } catch (err) {
       setPhotoErr(
-        err instanceof Error ? err.message : 'প্রোফাইল ছবি পরিবর্তন করা যায়নি। আবার চেষ্টা করুন।'
+        err instanceof Error ? err.message : 'প্রোফাইল ছবি সেভ করা যায়নি। আবার চেষ্টা করুন।'
       );
     } finally {
       setUploadingPhoto(false);
@@ -282,13 +302,17 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({
         </h1>
       </div>
 
-      {/* Hidden File Input */}
+      {/* Hidden File Input (sr-only for reliable mobile gallery picker) */}
       <input
+        id={photoInputId}
         ref={fileInputRef}
         type="file"
         accept="image/*"
+        onClick={(e) => {
+          e.currentTarget.value = '';
+        }}
         onChange={handlePhotoFileChange}
-        className="hidden"
+        className="sr-only"
       />
 
       {/* Card 1: Profile Picture */}
@@ -297,7 +321,7 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({
           <div className="relative shrink-0">
             <button
               type="button"
-              disabled={uploadingPhoto}
+              disabled={uploadingPhoto || preparingPhoto}
               onClick={() => setShowPhotoMenu(true)}
               aria-label="প্রোফাইল পিক অপশন দেখুন"
               className="relative block rounded-full focus:outline-none focus:ring-2 focus:ring-[#1B4D24]/40 cursor-pointer group disabled:opacity-60"
@@ -315,7 +339,7 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({
                 </div>
               )}
               <span className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-[#1B4D24]">
-                {uploadingPhoto ? (
+                {uploadingPhoto || preparingPhoto ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Camera className="w-4 h-4" />
@@ -340,19 +364,25 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({
             )}
 
             <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-              <button
-                type="button"
-                disabled={uploadingPhoto}
-                onClick={triggerPhotoPicker}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1B4D24] hover:bg-[#143A1B] text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-60"
+              <label
+                htmlFor={photoInputId}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1B4D24] hover:bg-[#143A1B] text-white text-xs font-bold transition-colors cursor-pointer select-none ${
+                  uploadingPhoto || preparingPhoto ? 'pointer-events-none opacity-60' : ''
+                }`}
               >
-                {uploadingPhoto ? (
+                {uploadingPhoto || preparingPhoto ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <Camera className="w-3.5 h-3.5" />
                 )}
-                <span>{uploadingPhoto ? 'আপলোড হচ্ছে...' : 'প্রোফাইল পিক পরিবর্তন করুন'}</span>
-              </button>
+                <span>
+                  {uploadingPhoto
+                    ? 'সেভ হচ্ছে...'
+                    : preparingPhoto
+                      ? 'প্রস্তুত হচ্ছে...'
+                      : 'প্রোফাইল পিক পরিবর্তন করুন'}
+                </span>
+              </label>
 
               <button
                 type="button"
@@ -574,124 +604,220 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({
         </div>
       </form>
 
-      {/* Profile Photo Action Menu Modal (2 Options) */}
-      <AnimatePresence>
-        {showPhotoMenu && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-4"
-            onClick={() => setShowPhotoMenu(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 24, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 18, scale: 0.98 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="w-full max-w-xs bg-white rounded-3xl p-4 shadow-2xl border border-gray-100 space-y-2"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="sm:hidden w-9 h-1 rounded-full bg-gray-200 mx-auto mb-1" />
-              <div className="flex items-center justify-between px-2 pb-1.5 border-b border-gray-100">
-                <span className="text-xs font-bold text-gray-500">প্রোফাইল ছবি</span>
-                <button
-                  type="button"
+      {/* Portaled Modals: Always centered on the exact visible mobile/desktop screen */}
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <>
+            {/* Profile Photo Action Menu Modal */}
+            <AnimatePresence>
+              {showPhotoMenu && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  className="fixed inset-0 h-[100dvh] w-full z-[80] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4"
                   onClick={() => setShowPhotoMenu(false)}
-                  aria-label="বন্ধ করুন"
-                  className="p-1 rounded-full hover:bg-gray-100 text-gray-500 cursor-pointer active:scale-90 transition-transform duration-150"
                 >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: 6 }}
+                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                    className="w-full max-w-xs bg-white rounded-3xl p-4 shadow-2xl border border-gray-100 space-y-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between px-2 pb-1.5 border-b border-gray-100">
+                      <span className="text-xs font-bold text-gray-500">প্রোফাইল ছবি</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowPhotoMenu(false)}
+                        aria-label="বন্ধ করুন"
+                        className="p-1 rounded-full hover:bg-gray-100 text-gray-500 cursor-pointer active:scale-90 transition-transform duration-150"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPhotoMenu(false);
-                  setShowPhotoViewer(true);
-                }}
-                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl hover:bg-[#F5F7F5] text-left text-sm font-bold text-[#1A1A1A] transition-all duration-150 active:scale-[0.98] cursor-pointer"
-              >
-                <span className="w-9 h-9 rounded-full bg-[#1B4D24]/10 text-[#1B4D24] flex items-center justify-center shrink-0">
-                  <Eye className="w-4 h-4" />
-                </span>
-                <span>ভিউ প্রোফাইল পিক</span>
-              </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPhotoMenu(false);
+                        setShowPhotoViewer(true);
+                      }}
+                      className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl hover:bg-[#F5F7F5] text-left text-sm font-bold text-[#1A1A1A] transition-all duration-150 active:scale-[0.98] cursor-pointer"
+                    >
+                      <span className="w-9 h-9 rounded-full bg-[#1B4D24]/10 text-[#1B4D24] flex items-center justify-center shrink-0">
+                        <Eye className="w-4 h-4" />
+                      </span>
+                      <span>ভিউ প্রোফাইল পিক</span>
+                    </button>
 
-              <button
-                type="button"
-                onClick={triggerPhotoPicker}
-                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl hover:bg-[#F5F7F5] text-left text-sm font-bold text-[#1A1A1A] transition-all duration-150 active:scale-[0.98] cursor-pointer"
-              >
-                <span className="w-9 h-9 rounded-full bg-[#C69214]/15 text-[#9A6E04] flex items-center justify-center shrink-0">
-                  <ImageIcon className="w-4 h-4" />
-                </span>
-                <span>প্রোফাইল পিক পরিবর্তন করুন</span>
-              </button>
-            </motion.div>
-          </motion.div>
+                    <label
+                      htmlFor={photoInputId}
+                      className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl hover:bg-[#F5F7F5] text-left text-sm font-bold text-[#1A1A1A] transition-all duration-150 active:scale-[0.98] cursor-pointer select-none"
+                    >
+                      <span className="w-9 h-9 rounded-full bg-[#C69214]/15 text-[#9A6E04] flex items-center justify-center shrink-0">
+                        <ImageIcon className="w-4 h-4" />
+                      </span>
+                      <span>প্রোফাইল পিক পরিবর্তন করুন</span>
+                    </label>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Selected Photo Preview + Save Modal */}
+            <AnimatePresence>
+              {pendingPhotoPreview && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  className="fixed inset-0 h-[100dvh] w-full z-[80] bg-black/75 backdrop-blur-xs flex items-center justify-center p-4"
+                  onClick={() => {
+                    if (!uploadingPhoto) setPendingPhotoPreview(null);
+                  }}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                    transition={{ duration: 0.21, ease: [0.22, 1, 0.36, 1] }}
+                    className="relative w-full max-w-sm bg-white rounded-3xl p-5 shadow-2xl text-center space-y-4"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      disabled={uploadingPhoto}
+                      onClick={() => setPendingPhotoPreview(null)}
+                      aria-label="বন্ধ করুন"
+                      className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 cursor-pointer disabled:opacity-50 active:scale-90 transition-transform duration-150"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+
+                    <div>
+                      <h3 className="text-base font-bold text-[#1A1A1A]">প্রোফাইল পিক প্রিভিউ</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        ছবিটি পছন্দ হলে নিচের সেভ বাটনে ক্লিক করুন
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-center py-1">
+                      <img
+                        src={pendingPhotoPreview}
+                        alt="নতুন প্রোফাইল ছবি প্রিভিউ"
+                        className="w-48 h-48 sm:w-56 sm:h-56 rounded-full object-cover border-4 border-[#1B4D24]/20 shadow-md"
+                      />
+                    </div>
+
+                    {photoErr && (
+                      <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+                        {photoErr}
+                      </div>
+                    )}
+
+                    <div className="space-y-2 pt-1">
+                      <button
+                        type="button"
+                        disabled={uploadingPhoto}
+                        onClick={handleSavePendingPhoto}
+                        className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#1B4D24] hover:bg-[#143A1B] text-white text-sm font-bold cursor-pointer disabled:opacity-60 active:scale-[0.98] transition-all duration-150"
+                      >
+                        {uploadingPhoto ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-4 h-4" />
+                        )}
+                        <span>{uploadingPhoto ? 'সেভ হচ্ছে...' : 'সেভ করুন'}</span>
+                      </button>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <label
+                          htmlFor={photoInputId}
+                          className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-gray-200 hover:bg-gray-50 text-xs font-bold text-gray-700 cursor-pointer select-none transition-colors ${
+                            uploadingPhoto ? 'pointer-events-none opacity-50' : ''
+                          }`}
+                        >
+                          <ImageIcon className="w-3.5 h-3.5 text-[#1B4D24]" />
+                          <span>অন্য ছবি বাছুন</span>
+                        </label>
+                        <button
+                          type="button"
+                          disabled={uploadingPhoto}
+                          onClick={() => setPendingPhotoPreview(null)}
+                          className="py-2.5 px-3 rounded-xl border border-gray-200 hover:bg-gray-50 text-xs font-bold text-gray-600 cursor-pointer disabled:opacity-50 transition-colors"
+                        >
+                          বাতিল করুন
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Full Profile Photo Lightbox Viewer */}
+            <AnimatePresence>
+              {showPhotoViewer && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  className="fixed inset-0 h-[100dvh] w-full z-[80] bg-black/80 backdrop-blur-xs flex items-center justify-center p-4"
+                  onClick={() => setShowPhotoViewer(false)}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                    transition={{ duration: 0.21, ease: [0.22, 1, 0.36, 1] }}
+                    className="relative w-full max-w-sm bg-white rounded-3xl p-5 shadow-2xl text-center space-y-4"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setShowPhotoViewer(false)}
+                      aria-label="বন্ধ করুন"
+                      className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 cursor-pointer active:scale-90 transition-transform duration-150"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+
+                    <h3 className="text-sm font-bold text-[#1A1A1A]">{user.displayName}</h3>
+
+                    <div className="flex items-center justify-center py-2">
+                      {user.photoURL ? (
+                        <img
+                          src={user.photoURL}
+                          alt={user.displayName}
+                          referrerPolicy="no-referrer"
+                          className="w-60 h-60 sm:w-68 sm:h-68 rounded-2xl object-cover border border-gray-200 shadow-md"
+                        />
+                      ) : (
+                        <div className="w-52 h-52 rounded-full bg-[#1B4D24] text-white flex items-center justify-center text-6xl font-bold shadow-md">
+                          {user.displayName.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+
+                    <label
+                      htmlFor={photoInputId}
+                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#1B4D24] hover:bg-[#143A1B] text-white text-xs font-bold cursor-pointer select-none active:scale-[0.98] transition-transform duration-150"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>প্রোফাইল পিক পরিবর্তন করুন</span>
+                    </label>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>,
+          document.body
         )}
-      </AnimatePresence>
-
-      {/* Full Profile Photo Lightbox Viewer */}
-      <AnimatePresence>
-        {showPhotoViewer && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4"
-            onClick={() => setShowPhotoViewer(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
-              transition={{ duration: 0.21, ease: [0.22, 1, 0.36, 1] }}
-              className="relative w-full max-w-sm bg-white rounded-3xl p-5 shadow-2xl text-center space-y-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                onClick={() => setShowPhotoViewer(false)}
-                aria-label="বন্ধ করুন"
-                className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 cursor-pointer active:scale-90 transition-transform duration-150"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <h3 className="text-sm font-bold text-[#1A1A1A]">{user.displayName}</h3>
-
-              <div className="flex items-center justify-center py-2">
-                {user.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt={user.displayName}
-                    referrerPolicy="no-referrer"
-                    className="w-60 h-60 sm:w-68 sm:h-68 rounded-2xl object-cover border border-gray-200 shadow-md"
-                  />
-                ) : (
-                  <div className="w-52 h-52 rounded-full bg-[#1B4D24] text-white flex items-center justify-center text-6xl font-bold shadow-md">
-                    {user.displayName.charAt(0)}
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={triggerPhotoPicker}
-                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#1B4D24] hover:bg-[#143A1B] text-white text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform duration-150"
-              >
-                <Camera className="w-4 h-4" />
-                <span>প্রোফাইল পিক পরিবর্তন করুন</span>
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </section>
   );
 };
