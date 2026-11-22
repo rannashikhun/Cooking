@@ -11,6 +11,7 @@ import {
   Edit3,
   ExternalLink,
   Globe,
+  HardDrive,
   ImagePlus,
   LayoutGrid,
   Mail,
@@ -64,6 +65,7 @@ import {
   extractGoogleVerificationFilename,
 } from '../utils/seoMeta';
 import { AdminSeoSettingsTab, AdminSocialShareTab } from './AdminSocialSeoTabs';
+import { AdminBackupTab } from './AdminBackupTab';
 import type {
   BlogPost,
   ContactMessage,
@@ -103,6 +105,7 @@ type AdminTab =
   | 'fonts'
   | 'social'
   | 'seo'
+  | 'backup'
   | 'settings';
 type MemberFilterView = 'all' | 'premium' | 'pending';
 
@@ -1083,6 +1086,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             { id: 'fonts', label: 'ফন্ট সেটিংস', icon: Type },
             { id: 'social', label: 'সোশ্যাল মিডিয়া শেয়ার', icon: Share2 },
             { id: 'seo', label: 'SEO সেটিংস', icon: Globe },
+            { id: 'backup', label: 'ব্যাকআপ ও রিস্টোর', icon: HardDrive },
             { id: 'settings', label: 'সাইট ও পেমেন্ট সেটিংস', icon: Settings },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -3153,7 +3157,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         />
       )}
 
-      {/* TAB 9: SITE & PAYMENT SETTINGS */}
+      {/* TAB 9: CONTENT BACKUP & RESTORE */}
+      {activeTab === 'backup' && (
+        <AdminBackupTab
+          recipes={recipes}
+          blogPosts={blogPosts}
+          tips={tips}
+          categories={categories}
+          siteSettings={siteSettings}
+          onNotify={notify}
+        />
+      )}
+
+      {/* TAB 10: SITE & PAYMENT SETTINGS */}
       {activeTab === 'settings' && (
         <form
           onSubmit={handleSaveSettings}
