@@ -31,13 +31,392 @@
       }
     </script>
     <link rel="icon" type="image/png" href="%BASE_URL%assets/favicon.png" />
+    <link rel="preload" as="image" href="%BASE_URL%assets/logo-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://banglawebfonts.pages.dev" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Atma:wght@400;500;600;700&family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@400;500;600;700&family=Tiro+Bangla:ital@0;1&display=swap" rel="stylesheet" />
     <link href="https://banglawebfonts.pages.dev/css/bensen-handwriting.min.css" rel="stylesheet" />
+    <style id="rs-mobile-splash-style">
+      #rs-mobile-splash {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100dvh;
+        min-height: 100vh;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #FCFBF8;
+        padding: 24px;
+        overflow: hidden;
+        touch-action: none;
+        overscroll-behavior: none;
+        user-select: none;
+        -webkit-user-select: none;
+        transition: opacity 0.44s cubic-bezier(0.22, 1, 0.36, 1), transform 0.44s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      @media (min-width: 768px) {
+        #rs-mobile-splash {
+          display: none !important;
+        }
+      }
+      #rs-mobile-splash.rs-splash-exit {
+        opacity: 0;
+        transform: scale(1.022);
+        pointer-events: none;
+      }
+      .rs-splash-bg-icons {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.045;
+        -webkit-mask-image: radial-gradient(circle at 50% 48%, rgba(0, 0, 0, 0.14) 0%, rgba(0, 0, 0, 1) 52%);
+        mask-image: radial-gradient(circle at 50% 48%, rgba(0, 0, 0, 0.14) 0%, rgba(0, 0, 0, 1) 52%);
+      }
+      .rs-splash-stage {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        margin-top: -20px;
+      }
+      .rs-splash-logo-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        animation: rs-splash-reveal 0.46s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+      .rs-splash-logo-svg {
+        width: 124px;
+        height: 88px;
+        overflow: visible;
+        display: block;
+      }
+      .rs-logo-shadow {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: rs-shadow-sync 1.35s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+      }
+      .rs-logo-pan {
+        transform-origin: 34px 28px;
+        animation: rs-pan-toss 1.35s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+      }
+      .rs-ing {
+        transform-box: fill-box;
+        transform-origin: center;
+        will-change: transform;
+      }
+      .rs-ing-chili {
+        animation: rs-toss-a 1.35s cubic-bezier(0.32, 0.72, 0, 1) 0.04s infinite;
+      }
+      .rs-ing-leaf-l {
+        animation: rs-toss-b 1.35s cubic-bezier(0.32, 0.72, 0, 1) 0.08s infinite;
+      }
+      .rs-ing-slice {
+        animation: rs-toss-c 1.35s cubic-bezier(0.32, 0.72, 0, 1) 0.12s infinite;
+      }
+      .rs-ing-mush-s {
+        animation: rs-toss-b 1.35s cubic-bezier(0.32, 0.72, 0, 1) 0.16s infinite;
+      }
+      .rs-ing-broc {
+        animation: rs-toss-high 1.35s cubic-bezier(0.32, 0.72, 0, 1) 0.1s infinite;
+      }
+      .rs-ing-mush-l {
+        animation: rs-toss-a 1.35s cubic-bezier(0.32, 0.72, 0, 1) 0.06s infinite;
+      }
+      .rs-ing-leaf-r {
+        animation: rs-toss-c 1.35s cubic-bezier(0.32, 0.72, 0, 1) 0.14s infinite;
+      }
+      .rs-spice-a {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: rs-spice-hop 1.35s ease-in-out 0.05s infinite;
+      }
+      .rs-spice-b {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: rs-spice-hop 1.35s ease-in-out 0.18s infinite;
+      }
+      .rs-spice-c {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: rs-spice-hop 1.35s ease-in-out 0.28s infinite;
+      }
+      .rs-splash-brand {
+        margin: 12px 0 0;
+        font-family: 'Noto Serif Bengali', 'Hind Siliguri', Georgia, serif;
+        font-size: 26px;
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: -0.015em;
+        animation: rs-splash-reveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+      }
+      .rs-splash-subtitle {
+        margin: 5px 0 0;
+        font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+        color: #6B655E;
+        letter-spacing: 0.01em;
+        animation: rs-splash-reveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.14s both;
+      }
+      .rs-splash-track {
+        margin-top: 20px;
+        width: 72px;
+        height: 2px;
+        border-radius: 9999px;
+        background: rgba(27, 77, 36, 0.09);
+        overflow: hidden;
+        animation: rs-splash-reveal 0.48s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+      }
+      .rs-splash-bar {
+        width: 46%;
+        height: 100%;
+        border-radius: 9999px;
+        background: linear-gradient(90deg, rgba(27, 77, 36, 0.12) 0%, #1B4D24 58%, #C69214 100%);
+        animation: rs-splash-glide 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      }
+      .rs-splash-footer {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: max(26px, env(safe-area-inset-bottom));
+        z-index: 1;
+        text-align: center;
+        font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
+        font-size: 11.5px;
+        font-weight: 500;
+        color: #938C82;
+        letter-spacing: 0.015em;
+        animation: rs-splash-reveal 0.54s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
+      }
+      @keyframes rs-splash-reveal {
+        0% { opacity: 0; transform: translate3d(0, 7px, 0); }
+        100% { opacity: 1; transform: translate3d(0, 0, 0); }
+      }
+      @keyframes rs-pan-toss {
+        0% { transform: rotate(0deg) translate3d(0, 0, 0); }
+        22% { transform: rotate(4.2deg) translate3d(0, 2px, 0); }
+        44% { transform: rotate(-6.2deg) translate3d(1px, -3px, 0); }
+        72% { transform: rotate(0.8deg) translate3d(0, 0.5px, 0); }
+        100% { transform: rotate(0deg) translate3d(0, 0, 0); }
+      }
+      @keyframes rs-shadow-sync {
+        0%, 100% { transform: scaleX(1); opacity: 0.72; }
+        22% { transform: scaleX(1.04); opacity: 0.8; }
+        48% { transform: scaleX(0.92); opacity: 0.54; }
+      }
+      @keyframes rs-toss-a {
+        0%, 24% { transform: translate3d(0, 1px, 0) rotate(0deg); }
+        56% { transform: translate3d(1px, -11px, 0) rotate(-10deg) scale(1.04); }
+        92%, 100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+      }
+      @keyframes rs-toss-b {
+        0%, 22% { transform: translate3d(0, 1px, 0) rotate(0deg); }
+        54% { transform: translate3d(-2px, -13px, 0) rotate(13deg) scale(1.05); }
+        90%, 100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+      }
+      @keyframes rs-toss-c {
+        0%, 24% { transform: translate3d(0, 1px, 0) rotate(0deg); }
+        58% { transform: translate3d(2px, -12px, 0) rotate(-14deg) scale(1.04); }
+        92%, 100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+      }
+      @keyframes rs-toss-high {
+        0%, 20% { transform: translate3d(0, 2px, 0) rotate(0deg); }
+        56% { transform: translate3d(2px, -16px, 0) rotate(12deg) scale(1.06); }
+        92%, 100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+      }
+      @keyframes rs-spice-hop {
+        0%, 22% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; }
+        56% { transform: translate3d(0, -9px, 0) scale(1.18); opacity: 1; }
+        92%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; }
+      }
+      @keyframes rs-splash-glide {
+        0% { transform: translate3d(-110%, 0, 0); }
+        100% { transform: translate3d(240%, 0, 0); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .rs-splash-logo-wrap,
+        .rs-logo-shadow,
+        .rs-logo-pan,
+        .rs-ing,
+        .rs-spice-a,
+        .rs-spice-b,
+        .rs-spice-c,
+        .rs-splash-brand,
+        .rs-splash-subtitle,
+        .rs-splash-track,
+        .rs-splash-bar,
+        .rs-splash-footer {
+          animation: none !important;
+        }
+        .rs-splash-bar {
+          width: 60%;
+          transform: translate3d(34%, 0, 0);
+        }
+      }
+    </style>
   </head>
   <body translate="no" class="notranslate bg-white text-[#1A1A1A] antialiased selection:bg-[#1B4D24]/15 selection:text-[#1B4D24]">
+    <div id="rs-mobile-splash" role="status" aria-live="polite" aria-label="রান্না শিখুন লোড হচ্ছে">
+      <div class="rs-splash-bg-icons" aria-hidden="true">
+        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="rs-cooking-motif" width="144" height="144" patternUnits="userSpaceOnUse">
+              <!-- Small Cooking Pot -->
+              <g stroke="#2C1108" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" fill="none">
+                <path d="M18 28 H38 V37 C38 40 35.5 42 32.5 42 H23.5 C20.5 42 18 40 18 37 Z" />
+                <path d="M15 30 H18 M38 30 H41" />
+                <path d="M21 25 H35 M26 22 H30" />
+              </g>
+              <!-- Herb Leaf -->
+              <g stroke="#1B4D24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none">
+                <path d="M96 24 C103 18 113 19 114 27 C107 34 97 33 96 24 Z" />
+                <path d="M94 31 L108 23" />
+              </g>
+              <!-- Wooden Spoon -->
+              <g stroke="#2C1108" stroke-width="1.3" stroke-linecap="round" fill="none">
+                <ellipse cx="122" cy="76" rx="5.5" ry="8" transform="rotate(28 122 76)" />
+                <line x1="118" y1="83" x2="108" y2="99" />
+              </g>
+              <!-- Chili Pepper -->
+              <g stroke="#1B4D24" stroke-width="1.3" stroke-linecap="round" fill="none">
+                <path d="M30 88 C36 84 44 88 42 97 C40 103 34 107 28 105 C33 100 34 93 30 88 Z" />
+                <path d="M30 88 C28 85 26 84 24 85" />
+              </g>
+              <!-- Bowl & Steam -->
+              <g stroke="#2C1108" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none">
+                <path d="M62 66 H84 C84 74 79 78 73 78 C67 78 62 74 62 66 Z" />
+                <path d="M69 61 C68 58 70 56 69 54" />
+                <path d="M76 61 C75 58 77 56 76 54" />
+              </g>
+              <!-- Rolling Pin -->
+              <g stroke="#1B4D24" stroke-width="1.25" stroke-linecap="round" fill="none">
+                <rect x="64" y="118" width="26" height="7" rx="3" transform="rotate(-16 64 118)" />
+                <line x1="59" y1="123" x2="64" y2="121.5" />
+                <line x1="90" y1="114" x2="95" y2="112.5" />
+              </g>
+              <!-- Spice Star -->
+              <g stroke="#2C1108" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+                <path d="M22 128 L24.5 133.5 L30 133.5 L25.5 137 L27.5 142 L22 139 L16.5 142 L18.5 137 L14 133.5 L19.5 133.5 Z" />
+              </g>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#rs-cooking-motif)" />
+        </svg>
+      </div>
+      <div class="rs-splash-stage">
+        <div class="rs-splash-logo-wrap">
+          <svg
+            class="rs-splash-logo-svg"
+            viewBox="0 0 220 156"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            role="img"
+            aria-label="রান্না শিখুন লোগো"
+          >
+            <!-- Soft Ground Shadow -->
+            <ellipse class="rs-logo-shadow" cx="78" cy="133" rx="74" ry="16" fill="#E6E7EA" />
+
+            <!-- Animated Tossing Wok / Pan -->
+            <g class="rs-logo-pan" fill="#231F1D">
+              <path d="M7.5 24.5C2.8 18.2 7.2 7.2 17.4 6.2C23.5 5.6 31.8 11.4 44.5 21.8C55.6 30.8 63.2 39.2 66.8 44.5C70.2 49.5 76.2 49.8 83.2 48.2C90.6 46.6 97.6 47.4 102.8 50.6C94.2 50.4 84.4 52.8 79.4 58.2C75.8 62.2 77.6 69.2 84.8 76.6C100.6 92.8 128.4 108.4 159.4 115.6C180.6 120.6 198.4 120.2 204.6 112.4C209.6 106.2 206.4 98.4 196.4 90.6C205.8 92.6 216.2 101.4 217.2 111.8C218.2 121.8 207.4 128.2 187.8 128.6C172.2 128.8 153.6 124.2 134.8 116.2C151.6 125.6 171.8 132.4 190.4 133.2C195.8 133.4 201.4 133.2 205.6 132.4C198.2 135.8 187.4 137.4 174.4 136.6C162.8 135.8 151.4 132.8 141.6 128.8C155.8 136.4 173.4 140.4 191.2 140.2C194.6 140.2 198.4 139.8 201.4 139.2C193.6 142.8 181.6 144.4 167.8 143.6C159.8 143 151.8 141.2 144.6 138.8C157.4 144.2 172.4 146.8 186.6 146.4C178.4 148.8 167.4 149.4 154.6 148.2C159.6 149.8 166.2 150.8 172.8 151C160.2 152.6 143.4 150.4 126.4 143.8C91.8 130.4 66.8 103.6 63.2 72.2C61.8 60.4 55.2 52.8 41.2 43.2C27.2 33.6 12.6 31.2 7.5 24.5Z" />
+            </g>
+
+            <!-- Red Chili Pepper -->
+            <g class="rs-ing rs-ing-chili">
+              <path
+                d="M118.5 84.8C123.6 88.6 130.4 87.2 136.8 81.8C141.4 77.8 146.6 77.6 148.6 81.4C150.4 84.8 147.8 89.2 141.8 91.2C132.6 94.2 122.4 92.2 118.5 84.8Z"
+                fill="#E51C23"
+              />
+            </g>
+
+            <!-- Left Green Herb Leaf -->
+            <g class="rs-ing rs-ing-leaf-l">
+              <path
+                d="M109.8 69.8C113.6 60.8 121.6 55.6 128.4 57.2C126.2 60.4 123.6 62.6 121.4 64.4C123.8 63.8 126.8 62.6 129.2 61.6C127.4 68.4 119.2 72.8 109.8 69.8Z"
+                fill="#8BC53F"
+              />
+            </g>
+
+            <!-- Dark Green Tomato / Lime Slice -->
+            <g class="rs-ing rs-ing-slice">
+              <path
+                d="M148.4 61.4C147.8 57.6 153.4 55.6 160.6 55.6C167.6 55.6 172.8 57.4 172.2 61.2C171.4 65.8 166.2 68.4 160.2 68.4C154.2 68.4 149.2 65.6 148.4 61.4Z"
+                fill="#0F6B36"
+              />
+              <path
+                d="M151.6 59.6C155.2 58.2 164.6 57.8 168.8 59.4M154.2 62.2C157.6 61.2 162.8 61 166.4 61.8"
+                stroke="#FCFBF8"
+                stroke-width="1.3"
+                stroke-linecap="round"
+              />
+            </g>
+
+            <!-- Small Gray Mushroom -->
+            <g class="rs-ing rs-ing-mush-s">
+              <path
+                d="M144.6 41.2C146.6 38.2 151.4 38.4 153.6 41.4C155.4 43.8 154.6 47.6 151.8 49.6L149.6 47.2L146.2 49.6L143.6 46.6L146.6 44.2L144.6 41.2Z"
+                fill="#C4C7CA"
+              />
+            </g>
+
+            <!-- Fresh Green Broccoli -->
+            <g class="rs-ing rs-ing-broc">
+              <path
+                d="M168.6 31.4C165.4 30.8 164.2 27.6 166.2 25.4C166.8 22.8 169.8 21.4 172.2 22.4C173.8 19.6 178.4 19.8 179.6 22.8C182.2 23.6 183.2 26.8 181.4 28.8C183.4 31.4 181.2 35.2 177.8 34.8C176.8 34.7 175.8 34.4 175.1 33.9L173.4 39.2L168.6 37.8L170.2 32.8C169.6 32.4 169.1 31.9 168.6 31.4Z"
+                fill="#2DAE4F"
+              />
+            </g>
+
+            <!-- Large Warm-Beige Mushroom -->
+            <g class="rs-ing rs-ing-mush-l">
+              <path
+                d="M179.4 73.2C171.2 72.4 165.2 78.6 165.4 86.8C165.6 94.8 172.2 100.4 180.4 99.6C182.6 99.4 184 98.2 183.8 96.4L183.2 91.6L190.8 90.2L189.2 80.2L181.6 81.4L181.2 76.2C181 74.4 180.4 73.3 179.4 73.2Z"
+                fill="#C2B49A"
+              />
+            </g>
+
+            <!-- Right Bright-Green Leaf -->
+            <g class="rs-ing rs-ing-leaf-r">
+              <path
+                d="M196.2 48.2C202.4 53.6 206.4 63.4 203.8 72.2C201.4 70.4 199.4 67.2 197.8 64.2C197.4 66.8 197.6 69.8 198.2 72.2C191.6 67.6 189.4 57.2 196.2 48.2Z"
+                fill="#8BC53F"
+              />
+            </g>
+
+            <!-- Tiny Dancing Spice & Herb Specks -->
+            <circle class="rs-spice-a" cx="96.5" cy="60.5" r="2.1" fill="#E51C23" />
+            <circle class="rs-spice-b" cx="130.5" cy="39.5" r="2.1" fill="#E51C23" />
+            <circle class="rs-spice-c" cx="184.5" cy="54.8" r="2.1" fill="#E51C23" />
+            <circle class="rs-spice-b" cx="165.6" cy="48.2" r="2" fill="#F39C12" />
+            <circle class="rs-spice-a" cx="190.2" cy="29.4" r="1.8" fill="#F39C12" />
+            <circle class="rs-spice-c" cx="199.6" cy="79.2" r="2" fill="#F39C12" />
+            <circle class="rs-spice-a" cx="160.2" cy="96.4" r="2.1" fill="#F39C12" />
+            <circle class="rs-spice-c" cx="140.4" cy="70.8" r="2" fill="#2DAE4F" />
+            <circle class="rs-spice-a" cx="162.4" cy="19.8" r="1.7" fill="#2DAE4F" />
+            <circle class="rs-spice-b" cx="191.8" cy="106.2" r="1.7" fill="#2DAE4F" />
+            <circle class="rs-spice-b" cx="143.2" cy="96.8" r="1.9" fill="#E2E5E9" />
+          </svg>
+        </div>
+        <p class="rs-splash-brand">
+          <span style="color:#2C1108;">রান্না</span>
+          <span style="color:#1B4D24;margin-left:4px;">শিখুন</span>
+        </p>
+        <p class="rs-splash-subtitle">ঘরোয়া স্বাদের বিশ্বস্ত ঠিকানা</p>
+        <div class="rs-splash-track" aria-hidden="true">
+          <div class="rs-splash-bar"></div>
+        </div>
+      </div>
+      <div class="rs-splash-footer">সাজানো হচ্ছে আপনার রান্নাঘর...</div>
+    </div>
+    <script>window.__rsSplashStart = Date.now();</script>
     <div id="root" translate="no" class="notranslate"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
@@ -48,6 +427,8 @@
           var root = document.getElementById('root');
           if (!root || root.childElementCount > 0) return;
           shown = true;
+          var splash = document.getElementById('rs-mobile-splash');
+          if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
           root.innerHTML =
             '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#FAF9F6;font-family:sans-serif;">' +
               '<div style="max-width:460px;width:100%;background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:28px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.05);">' +

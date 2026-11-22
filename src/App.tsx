@@ -197,6 +197,7 @@ export default function App() {
   const [mobileNavDir, setMobileNavDir] = useState<MobileNavDirection>('none');
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [catalogHydrated, setCatalogHydrated] = useState(false);
 
   const [recipes, setRecipes] = useState<Recipe[]>(() => SEED_RECIPES.map((s) => s.recipe));
   const [categories, setCategories] = useState<RecipeCategory[]>(() => SEED_CATEGORIES);
@@ -219,6 +220,70 @@ export default function App() {
   const lastVersionCheckRef = useRef<number>(0);
   const hasPendingAppUpdateRef = useRef<boolean>(false);
   const routeLoadingTimerRef = useRef<number | null>(null);
+  const splashDismissedRef = useRef<boolean>(false);
+
+  // Dismiss initial minimal mobile splash screen gracefully once ready
+  useEffect(() => {
+    if (splashDismissedRef.current) return;
+    const splashEl = document.getElementById('rs-mobile-splash');
+    if (!splashEl) {
+      splashDismissedRef.current = true;
+      return;
+    }
+
+    const cleanupSplash = () => {
+      if (splashDismissedRef.current) return;
+      splashDismissedRef.current = true;
+      const el = document.getElementById('rs-mobile-splash');
+      if (!el) return;
+      el.classList.add('rs-splash-exit');
+      window.setTimeout(() => {
+        el.remove();
+        document.getElementById('rs-mobile-splash-style')?.remove();
+      }, 460);
+    };
+
+    // Desktop viewports never show the mobile splash
+    if (!window.matchMedia('(max-width: 767px)').matches) {
+      splashDismissedRef.current = true;
+      splashEl.remove();
+      document.getElementById('rs-mobile-splash-style')?.remove();
+      return;
+    }
+
+    const startTime =
+      (window as Window & { __rsSplashStart?: number }).__rsSplashStart || Date.now();
+    const elapsed = Date.now() - startTime;
+    const MIN_VISIBLE_MS = 1200;
+    const MAX_WAIT_MS = 2050;
+
+    // Hard upper-bound safeguard so slow connections never stall
+    let cancelled = false;
+    const hardTimeout = window.setTimeout(cleanupSplash, Math.max(120, MAX_WAIT_MS - elapsed));
+    let readyTimer: number | null = null;
+
+    if (authReady && catalogHydrated) {
+      const waitFonts =
+        document.fonts && document.fonts.ready
+          ? Promise.race([
+              document.fonts.ready,
+              new Promise<void>((resolve) => window.setTimeout(resolve, 420)),
+            ])
+          : Promise.resolve();
+
+      waitFonts.finally(() => {
+        if (cancelled) return;
+        const remainingMin = Math.max(0, MIN_VISIBLE_MS - (Date.now() - startTime));
+        readyTimer = window.setTimeout(cleanupSplash, remainingMin);
+      });
+    }
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(hardTimeout);
+      if (readyTimer !== null) window.clearTimeout(readyTimer);
+    };
+  }, [authReady, catalogHydrated]);
 
   useEffect(() => {
     setRecipesPage(1);
@@ -508,6 +573,7 @@ export default function App() {
           const list = snap.docs.map((d) => ({ ...(d.data() as Recipe), id: d.id }));
           setRecipes(sortRecipesNewestFirst(list));
         }
+        setCatalogHydrated(true);
       },
       (error) => console.error('Recipes snapshot error:', error)
     );
@@ -581,7 +647,9 @@ export default function App() {
     );
 
     // Initial server check so live updates are guaranteed right away
-    syncCatalogFromServer(true);
+    syncCatalogFromServer(true).finally(() => {
+      setCatalogHydrated(true);
+    });
 
     const handleVisibilityOrOnline = () => {
       if (document.visibilityState === 'visible') {
