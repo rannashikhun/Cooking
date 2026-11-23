@@ -211,7 +211,26 @@ export default function App() {
   const [recipesPage, setRecipesPage] = useState<number>(1);
   const [categoryPageNum, setCategoryPageNum] = useState<number>(1);
   const [interestVersion, setInterestVersion] = useState<number>(0);
-  const [pendingCheckoutPlanId, setPendingCheckoutPlanId] = useState<string | null>(null);
+  const [authReturnRoute, setAuthReturnRoute] = useState<PageRoute | null>(() => {
+    try {
+      const raw = sessionStorage.getItem('rs_auth_return_route');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as PageRoute;
+      return parsed && typeof parsed.page === 'string' && parsed.page !== 'login' ? parsed : null;
+    } catch {
+      return null;
+    }
+  });
+  const [pendingCheckoutPlanId, setPendingCheckoutPlanId] = useState<string | null>(() => {
+    try {
+      const raw = sessionStorage.getItem('rs_auth_return_route');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as PageRoute;
+      return parsed && parsed.page === 'checkout' ? parsed.planId : null;
+    } catch {
+      return null;
+    }
+  });
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
@@ -365,13 +384,35 @@ export default function App() {
     };
   }, []);
 
-  const navigate = (nextRoute: PageRoute) => {
+  const persistAuthReturnRoute = (target: PageRoute | null) => {
+    setAuthReturnRoute(target);
+    setPendingCheckoutPlanId(target && target.page === 'checkout' ? target.planId : null);
+    try {
+      if (target && target.page !== 'login') {
+        sessionStorage.setItem('rs_auth_return_route', JSON.stringify(target));
+      } else {
+        sessionStorage.removeItem('rs_auth_return_route');
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  const navigate = (nextRoute: PageRoute, options?: { returnRoute?: PageRoute }) => {
     if (nextRoute.page === 'recipe-detail') {
       recordRecipeInterestSignal(user?.uid, nextRoute.id);
       setInterestVersion((v) => v + 1);
     }
-    if (nextRoute.page !== 'login') {
-      setPendingCheckoutPlanId(null);
+    if (nextRoute.page === 'login') {
+      const resolvedReturn =
+        options?.returnRoute && options.returnRoute.page !== 'login'
+          ? options.returnRoute
+          : route.page !== 'login'
+            ? route
+            : authReturnRoute;
+      persistAuthReturnRoute(resolvedReturn);
+    } else {
+      persistAuthReturnRoute(null);
     }
 
     const targetPath = withAppBase(routeToPath(nextRoute));
@@ -406,11 +447,10 @@ export default function App() {
 
   const handleSelectPlan = (plan: SubscriptionPlan) => {
     if (!user) {
-      setPendingCheckoutPlanId(plan.id);
-      navigate({ page: 'login' });
+      navigate({ page: 'login' }, { returnRoute: { page: 'checkout', planId: plan.id } });
       return;
     }
-    setPendingCheckoutPlanId(null);
+    persistAuthReturnRoute(null);
     navigate({ page: 'checkout', planId: plan.id });
   };
 
@@ -486,75 +526,95 @@ export default function App() {
         if (profile.role === 'admin' && fbUser.emailVerified) {
           seedInitialDatabaseIfNeeded(false).catch(() => {});
         }
-
-        notifUnsub = onSnapshot(
-          query(
-            collection(db, 'users', fbUser.uid, 'notifications'),
-            orderBy('createdAt', 'desc')
-          ),
-          (snap) => {
-            setNotifications(
-              snap.docs.map((d) => ({
-                id: d.id,
-                ...(d.data() as Omit<UserNotification, 'id'>),
-              }))
-            );
-          },
-          () => {
-            setNotifications([]);
-          }
-        );
-
-        userDocUnsub = onSnapshot(
-          doc(db, 'users', fbUser.uid),
-          (snap) => {
-            if (snap.exists()) {
-              const data = snap.data() as UserProfile;
-              const verifiedAdmin =
-                fbUser.emailVerified &&
-                (isSuperAdminEmail(fbUser.email) || data.role === 'admin');
-              setUser((prev) => {
-                if (
-                  prev?.lastOrderId &&
-                  data.lastOrderId &&
-                  data.lastOrderId !== prev.lastOrderId &&
-                  (data.subscriptionPlan === 'standard' || data.subscriptionPlan === 'pro')
-                ) {
-                  clearUserLocalReads(fbUser.uid);
-                }
-                return {
-                  ...data,
-                  uid: fbUser.uid,
-                  favoriteRecipeIds: Array.isArray(data.favoriteRecipeIds) ? data.favoriteRecipeIds : [],
-                  unlockedRecipeIds: Array.isArray(data.unlockedRecipeIds) ? data.unlockedRecipeIds : [],
-                  freeUnlockedRecipeIds: Array.isArray(data.freeUnlockedRecipeIds)
-                    ? data.freeUnlockedRecipeIds
-                    : prev?.freeUnlockedRecipeIds || [],
-                  premiumUnlockedRecipeIds: Array.isArray(data.premiumUnlockedRecipeIds)
-                    ? data.premiumUnlockedRecipeIds
-                    : prev?.premiumUnlockedRecipeIds || [],
-                  premiumRecipeQuota:
-                    typeof data.premiumRecipeQuota === 'number'
-                      ? data.premiumRecipeQuota
-                      : prev?.premiumRecipeQuota || 0,
-                  viewedHistory: Array.isArray(data.viewedHistory)
-                    ? data.viewedHistory
-                    : prev?.viewedHistory || [],
-                  role:
-                    verifiedAdmin || (fbUser.emailVerified && prev?.role === 'admin')
-                      ? 'admin'
-                      : 'member',
-                };
-              });
-            }
-          },
-          () => {}
-        );
       } catch {
-        setUser(null);
-      } finally {
-        setAuthReady(true);
+        setUser((prev) => {
+          if (prev && prev.uid === fbUser.uid) {
+            return prev;
+          }
+          const verifiedAdmin = fbUser.emailVerified && isSuperAdminEmail(fbUser.email);
+          return {
+            uid: fbUser.uid,
+            displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'অতিথি রাঁধুনি',
+            email: fbUser.email || '',
+            photoURL: fbUser.photoURL || undefined,
+            role: verifiedAdmin ? 'admin' : 'member',
+            subscriptionPlan: verifiedAdmin ? 'pro' : 'basic',
+            subscriptionStatus: 'active',
+            favoriteRecipeIds: [],
+            unlockedRecipeIds: [],
+            freeUnlockedRecipeIds: [],
+            premiumUnlockedRecipeIds: [],
+            premiumRecipeQuota: 0,
+            viewedHistory: [],
+          };
+        });
       }
+
+      notifUnsub = onSnapshot(
+        query(
+          collection(db, 'users', fbUser.uid, 'notifications'),
+          orderBy('createdAt', 'desc')
+        ),
+        (snap) => {
+          setNotifications(
+            snap.docs.map((d) => ({
+              id: d.id,
+              ...(d.data() as Omit<UserNotification, 'id'>),
+            }))
+          );
+        },
+        () => {
+          setNotifications([]);
+        }
+      );
+
+      userDocUnsub = onSnapshot(
+        doc(db, 'users', fbUser.uid),
+        (snap) => {
+          if (snap.exists()) {
+            const data = snap.data() as UserProfile;
+            const verifiedAdmin =
+              fbUser.emailVerified &&
+              (isSuperAdminEmail(fbUser.email) || data.role === 'admin');
+            setUser((prev) => {
+              if (
+                prev?.lastOrderId &&
+                data.lastOrderId &&
+                data.lastOrderId !== prev.lastOrderId &&
+                (data.subscriptionPlan === 'standard' || data.subscriptionPlan === 'pro')
+              ) {
+                clearUserLocalReads(fbUser.uid);
+              }
+              return {
+                ...data,
+                uid: fbUser.uid,
+                favoriteRecipeIds: Array.isArray(data.favoriteRecipeIds) ? data.favoriteRecipeIds : [],
+                unlockedRecipeIds: Array.isArray(data.unlockedRecipeIds) ? data.unlockedRecipeIds : [],
+                freeUnlockedRecipeIds: Array.isArray(data.freeUnlockedRecipeIds)
+                  ? data.freeUnlockedRecipeIds
+                  : prev?.freeUnlockedRecipeIds || [],
+                premiumUnlockedRecipeIds: Array.isArray(data.premiumUnlockedRecipeIds)
+                  ? data.premiumUnlockedRecipeIds
+                  : prev?.premiumUnlockedRecipeIds || [],
+                premiumRecipeQuota:
+                  typeof data.premiumRecipeQuota === 'number'
+                    ? data.premiumRecipeQuota
+                    : prev?.premiumRecipeQuota || 0,
+                viewedHistory: Array.isArray(data.viewedHistory)
+                  ? data.viewedHistory
+                  : prev?.viewedHistory || [],
+                role:
+                  verifiedAdmin || (fbUser.emailVerified && prev?.role === 'admin')
+                    ? 'admin'
+                    : 'member',
+              };
+            });
+          }
+        },
+        () => {}
+      );
+
+      setAuthReady(true);
     });
 
     return () => {
@@ -1075,8 +1135,7 @@ export default function App() {
             siteSettings={siteSettings}
             onNavigate={navigate}
             onRequireAuth={(planId) => {
-              setPendingCheckoutPlanId(planId);
-              navigate({ page: 'login' });
+              navigate({ page: 'login' }, { returnRoute: { page: 'checkout', planId } });
             }}
             onOrderComplete={(status, planName) => {
               if (status === 'active') {
@@ -1166,6 +1225,7 @@ export default function App() {
                 ? plans.find((p) => p.id === pendingCheckoutPlanId) || null
                 : null
             }
+            returnRoute={authReturnRoute}
           />
         )}
 
@@ -1224,6 +1284,7 @@ export default function App() {
               siteName={siteSettings.siteName}
               onNavigate={navigate}
               onProfileSynced={(profile) => setUser(profile)}
+              returnRoute={{ page: 'admin' }}
             />
           ) : (
             <AdminPanel

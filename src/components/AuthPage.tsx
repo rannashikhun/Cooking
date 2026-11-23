@@ -22,6 +22,7 @@ interface AuthPageProps {
   onAuthSuccess?: () => void;
   onProfileSynced?: (profile: UserProfile) => void;
   pendingPlan?: SubscriptionPlan | null;
+  returnRoute?: PageRoute | null;
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({
@@ -30,6 +31,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   onAuthSuccess,
   onProfileSynced,
   pendingPlan = null,
+  returnRoute = null,
 }) => {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [name, setName] = useState('');
@@ -42,10 +44,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   const handleSuccessRedirect = (userEmail?: string | null) => {
     if (onAuthSuccess) onAuthSuccess();
-    if (isSuperAdminEmail(userEmail)) {
-      onNavigate({ page: 'admin' });
-    } else if (pendingPlan) {
+    if (pendingPlan) {
       onNavigate({ page: 'checkout', planId: pendingPlan.id });
+    } else if (returnRoute && returnRoute.page !== 'login') {
+      onNavigate(returnRoute);
+    } else if (isSuperAdminEmail(userEmail)) {
+      onNavigate({ page: 'admin' });
     } else {
       onNavigate({ page: 'profile' });
     }
@@ -58,7 +62,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setLoading(true);
     try {
       const cred = await signInWithPopup(auth, googleProvider);
-      const profile = await syncUserProfile(cred.user);
+      let profile: UserProfile;
+      try {
+        profile = await syncUserProfile(cred.user);
+      } catch {
+        const verifiedAdmin = cred.user.emailVerified && isSuperAdminEmail(cred.user.email);
+        profile = {
+          uid: cred.user.uid,
+          displayName: cred.user.displayName || cred.user.email?.split('@')[0] || 'অতিথি রাঁধুনি',
+          email: cred.user.email || '',
+          photoURL: cred.user.photoURL || undefined,
+          role: verifiedAdmin ? 'admin' : 'member',
+          subscriptionPlan: verifiedAdmin ? 'pro' : 'basic',
+          subscriptionStatus: 'active',
+          favoriteRecipeIds: [],
+          unlockedRecipeIds: [],
+          freeUnlockedRecipeIds: [],
+          premiumUnlockedRecipeIds: [],
+          premiumRecipeQuota: 0,
+          viewedHistory: [],
+        };
+      }
       onProfileSynced?.(profile);
       handleSuccessRedirect(cred.user.email);
     } catch (err: unknown) {
@@ -329,7 +353,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   : 'লগইন করুন'
                 : pendingPlan
                   ? 'অ্যাকাউন্ট তৈরি করে পেমেন্ট পেজে যান'
-                  : 'অ্যাকাউন্ট তৈরি করুন ও প্রোফাইলে যান'}
+                  : returnRoute && returnRoute.page !== 'profile'
+                    ? 'অ্যাকাউন্ট তৈরি করুন'
+                    : 'অ্যাকাউন্ট তৈরি করুন ও প্রোফাইলে যান'}
           </button>
         </form>
       </div>
