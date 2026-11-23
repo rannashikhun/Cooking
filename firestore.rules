@@ -41,6 +41,16 @@ service cloud.firestore {
       );
     }
 
+    function isBootstrappedModerator() {
+      return isSignedIn() && request.auth.token.email == 'p8801764484696@phone.rannashikhun.app';
+    }
+
+    function isModerator() {
+      return isBootstrappedModerator() || (
+        isSignedIn() && exists(/databases/$(database)/documents/moderators/$(request.auth.uid))
+      );
+    }
+
     function hasActivePaidSubData(u) {
       return u.subscriptionStatus == 'active' &&
         u.subscriptionPlan in ['standard', 'pro'] &&
@@ -75,7 +85,8 @@ service cloud.firestore {
         data.keys().hasOnly([
           'title', 'subtitle', 'imageUrl', 'cuisine', 'dietType', 'category',
           'cookTime', 'prepTime', 'difficulty', 'servings', 'rating',
-          'ratingCount', 'isPremium', 'isFeatured', 'orderIndex', 'createdAt', 'updatedAt'
+          'ratingCount', 'isPremium', 'isFeatured', 'orderIndex',
+          'createdByUid', 'createdByName', 'createdAt', 'updatedAt'
         ]) &&
         data.title is string && data.title.size() >= 2 && data.title.size() <= 140 &&
         data.subtitle is string && data.subtitle.size() <= 260 &&
@@ -92,6 +103,8 @@ service cloud.firestore {
         data.isPremium is bool &&
         data.isFeatured is bool &&
         data.orderIndex is int && data.orderIndex >= 0 &&
+        (!('createdByUid' in data) || isValidId(data.createdByUid)) &&
+        (!('createdByName' in data) || (data.createdByName is string && data.createdByName.size() <= 100)) &&
         data.createdAt is timestamp &&
         data.updatedAt is timestamp;
     }
@@ -174,7 +187,9 @@ service cloud.firestore {
           'uid', 'displayName', 'email', 'phoneNumber', 'photoURL', 'address', 'age', 'role', 'subscriptionPlan',
           'subscriptionStatus', 'subscriptionExpiresAt', 'lastOrderId',
           'favoriteRecipeIds', 'unlockedRecipeIds', 'freeUnlockedRecipeIds',
-          'premiumUnlockedRecipeIds', 'premiumRecipeQuota', 'viewedHistory', 'createdAt', 'updatedAt'
+          'premiumUnlockedRecipeIds', 'premiumRecipeQuota', 'viewedHistory',
+          'isOnline', 'lastActiveAt', 'lastLoginDevice', 'lastLoginLocation',
+          'createdAt', 'updatedAt'
         ]) &&
         isValidId(data.uid) &&
         data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
@@ -183,7 +198,7 @@ service cloud.firestore {
         (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 160000)) &&
         (!('address' in data) || (data.address is string && data.address.size() <= 240)) &&
         (!('age' in data) || (data.age is int && data.age >= 1 && data.age <= 120)) &&
-        data.role in ['member', 'admin'] &&
+        data.role in ['member', 'moderator', 'admin'] &&
         data.subscriptionPlan in ['basic', 'standard', 'pro'] &&
         data.subscriptionStatus in ['active', 'expired'] &&
         (!('subscriptionExpiresAt' in data) || data.subscriptionExpiresAt is timestamp) &&
@@ -215,6 +230,10 @@ service cloud.firestore {
             data.viewedHistory[0].viewedAt is int
           ))
         )) &&
+        (!('isOnline' in data) || data.isOnline is bool) &&
+        (!('lastActiveAt' in data) || data.lastActiveAt is timestamp) &&
+        (!('lastLoginDevice' in data) || (data.lastLoginDevice is string && data.lastLoginDevice.size() <= 160)) &&
+        (!('lastLoginLocation' in data) || (data.lastLoginLocation is string && data.lastLoginLocation.size() <= 160)) &&
         data.createdAt is timestamp &&
         data.updatedAt is timestamp;
     }
@@ -227,7 +246,7 @@ service cloud.firestore {
         ]) &&
         data.type in [
           'comment_reply', 'payment_approved', 'payment_rejected', 'payment_pending',
-          'free_limit_reached', 'pro_limit_reached', 'plan_expiry_reminder'
+          'free_limit_reached', 'pro_limit_reached', 'plan_expiry_reminder', 'admin_message'
         ] &&
         data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
         data.message is string && data.message.size() >= 1 && data.message.size() <= 400 &&
@@ -236,6 +255,36 @@ service cloud.firestore {
         (!('senderUid' in data) || isValidId(data.senderUid)) &&
         (!('senderName' in data) || (data.senderName is string && data.senderName.size() <= 100)) &&
         data.isRead is bool &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidDirectThread(data) {
+      return data.keys().hasAll([
+          'userId', 'userName', 'lastMessage', 'lastSenderRole',
+          'unreadByAdmin', 'unreadByUser', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'userName', 'userContact', 'userPhotoURL',
+          'lastMessage', 'lastSenderRole', 'unreadByAdmin', 'unreadByUser', 'updatedAt'
+        ]) &&
+        isValidId(data.userId) &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 100 &&
+        (!('userContact' in data) || (data.userContact is string && data.userContact.size() <= 160)) &&
+        (!('userPhotoURL' in data) || (data.userPhotoURL is string && data.userPhotoURL.size() <= 160000)) &&
+        data.lastMessage is string && data.lastMessage.size() <= 1000 &&
+        data.lastSenderRole in ['admin', 'user'] &&
+        data.unreadByAdmin is int && data.unreadByAdmin >= 0 && data.unreadByAdmin <= 10000 &&
+        data.unreadByUser is int && data.unreadByUser >= 0 && data.unreadByUser <= 10000 &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidDirectMessage(data) {
+      return data.keys().hasAll(['senderUid', 'senderName', 'senderRole', 'text', 'createdAt']) &&
+        data.keys().hasOnly(['senderUid', 'senderName', 'senderRole', 'text', 'createdAt']) &&
+        isValidId(data.senderUid) &&
+        data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 100 &&
+        data.senderRole in ['admin', 'user'] &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 1000 &&
         data.createdAt is timestamp;
     }
 
@@ -269,20 +318,22 @@ service cloud.firestore {
 
     function isValidTip(data) {
       return data.keys().hasAll(['title', 'category', 'summary', 'content', 'readTime', 'isPublished', 'createdAt', 'updatedAt']) &&
-        data.keys().hasOnly(['title', 'category', 'summary', 'content', 'readTime', 'isPublished', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['title', 'category', 'summary', 'content', 'readTime', 'isPublished', 'createdByUid', 'createdByName', 'createdAt', 'updatedAt']) &&
         data.title is string && data.title.size() >= 2 && data.title.size() <= 140 &&
         data.category is string && data.category.size() <= 50 &&
         data.summary is string && data.summary.size() <= 300 &&
         data.content is string && data.content.size() <= 5000 &&
         data.readTime is string && data.readTime.size() <= 30 &&
         data.isPublished is bool &&
+        (!('createdByUid' in data) || isValidId(data.createdByUid)) &&
+        (!('createdByName' in data) || (data.createdByName is string && data.createdByName.size() <= 100)) &&
         data.createdAt is timestamp &&
         data.updatedAt is timestamp;
     }
 
     function isValidBlogPost(data) {
       return data.keys().hasAll(['title', 'excerpt', 'content', 'imageUrl', 'authorName', 'category', 'readTime', 'isPublished', 'createdAt', 'updatedAt']) &&
-        data.keys().hasOnly(['title', 'excerpt', 'content', 'imageUrl', 'authorName', 'category', 'readTime', 'isPublished', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['title', 'excerpt', 'content', 'imageUrl', 'authorName', 'category', 'readTime', 'isPublished', 'createdByUid', 'createdByName', 'createdAt', 'updatedAt']) &&
         data.title is string && data.title.size() >= 2 && data.title.size() <= 160 &&
         data.excerpt is string && data.excerpt.size() <= 320 &&
         data.content is string && data.content.size() <= 8000 &&
@@ -291,8 +342,77 @@ service cloud.firestore {
         data.category is string && data.category.size() <= 50 &&
         data.readTime is string && data.readTime.size() <= 30 &&
         data.isPublished is bool &&
+        (!('createdByUid' in data) || isValidId(data.createdByUid)) &&
+        (!('createdByName' in data) || (data.createdByName is string && data.createdByName.size() <= 100)) &&
         data.createdAt is timestamp &&
         data.updatedAt is timestamp;
+    }
+
+    function isStrMax(val, maxLen) {
+      return val is string && val.size() <= maxLen;
+    }
+
+    function isValidSiteFonts(data) {
+      return [
+        data.get('recipeFontDesktop', 'bensen'),
+        data.get('recipeFontMobile', 'bensen'),
+        data.get('adminFontFamily', 'hind-siliguri'),
+        data.get('adminFontMobile', 'hind-siliguri'),
+        data.get('profileFontFamily', 'hind-siliguri'),
+        data.get('profileFontMobile', 'hind-siliguri'),
+        data.get('checkoutFontFamily', 'hind-siliguri'),
+        data.get('checkoutFontMobile', 'hind-siliguri'),
+        data.get('homeFontFamily', 'hind-siliguri'),
+        data.get('homeFontMobile', 'hind-siliguri'),
+        data.get('pricingFontFamily', 'hind-siliguri'),
+        data.get('pricingFontMobile', 'hind-siliguri'),
+        data.get('blogTipsFontFamily', 'hind-siliguri'),
+        data.get('blogTipsFontMobile', 'hind-siliguri'),
+        data.get('authFontFamily', 'hind-siliguri'),
+        data.get('authFontMobile', 'hind-siliguri')
+      ].hasOnly([
+        'bensen', 'atma', 'alkatra', 'galada', 'tiro-italic',
+        'noto-serif', 'tiro', 'hind-siliguri', 'anek-bangla',
+        'baloo-da-2', 'mina', 'noto-sans'
+      ]) && [
+        data.get('recipeFontSizeDesktop', '100'),
+        data.get('recipeFontSizeMobile', '100'),
+        data.get('adminFontSize', '100'),
+        data.get('adminFontSizeMobile', '100'),
+        data.get('profileFontSize', '100'),
+        data.get('profileFontSizeMobile', '100'),
+        data.get('checkoutFontSize', '100'),
+        data.get('checkoutFontSizeMobile', '100'),
+        data.get('homeFontSize', '100'),
+        data.get('homeFontSizeMobile', '100'),
+        data.get('pricingFontSize', '100'),
+        data.get('pricingFontSizeMobile', '100'),
+        data.get('blogTipsFontSize', '100'),
+        data.get('blogTipsFontSizeMobile', '100'),
+        data.get('authFontSize', '100'),
+        data.get('authFontSizeMobile', '100')
+      ].hasOnly(['100', '105', '110', '115', '120', 'sm', 'md', 'lg', 'xl']);
+    }
+
+    function isValidSiteSeoAndSocial(data) {
+      return isStrMax(data.get('seoTitle', ''), 160) &&
+        isStrMax(data.get('seoDescription', ''), 400) &&
+        isStrMax(data.get('seoKeywords', ''), 600) &&
+        isStrMax(data.get('seoAuthor', ''), 120) &&
+        isStrMax(data.get('canonicalBaseUrl', ''), 240) &&
+        data.get('seoRobotsPolicy', 'index, follow') in ['index, follow', 'noindex, nofollow'] &&
+        isStrMax(data.get('googleSiteVerification', ''), 180) &&
+        isStrMax(data.get('googleVerificationFile', ''), 160) &&
+        isStrMax(data.get('bingSiteVerification', ''), 180) &&
+        isStrMax(data.get('googleAnalyticsId', ''), 60) &&
+        isStrMax(data.get('robotsTxtExtra', ''), 1000) &&
+        isStrMax(data.get('socialShareImageUrl', ''), 750000) &&
+        isStrMax(data.get('socialShareTitle', ''), 160) &&
+        isStrMax(data.get('socialShareDescription', ''), 400) &&
+        isStrMax(data.get('socialShareImageAlt', ''), 200) &&
+        isStrMax(data.get('twitterHandle', ''), 80) &&
+        isStrMax(data.get('fbAppId', ''), 60) &&
+        data.get('showRecipeShareButton', true) is bool;
     }
 
     function isValidSiteSettings(data) {
@@ -302,8 +422,13 @@ service cloud.firestore {
           'paymentBkashNumber', 'paymentNagadNumber', 'paymentInstructions',
           'recipeFontDesktop', 'recipeFontMobile',
           'recipeFontSizeDesktop', 'recipeFontSizeMobile',
-          'adminFontFamily', 'adminFontSize',
-          'profileFontFamily', 'profileFontSize',
+          'adminFontFamily', 'adminFontMobile', 'adminFontSize', 'adminFontSizeMobile',
+          'profileFontFamily', 'profileFontMobile', 'profileFontSize', 'profileFontSizeMobile',
+          'checkoutFontFamily', 'checkoutFontMobile', 'checkoutFontSize', 'checkoutFontSizeMobile',
+          'homeFontFamily', 'homeFontMobile', 'homeFontSize', 'homeFontSizeMobile',
+          'pricingFontFamily', 'pricingFontMobile', 'pricingFontSize', 'pricingFontSizeMobile',
+          'blogTipsFontFamily', 'blogTipsFontMobile', 'blogTipsFontSize', 'blogTipsFontSizeMobile',
+          'authFontFamily', 'authFontMobile', 'authFontSize', 'authFontSizeMobile',
           'seoTitle', 'seoDescription', 'seoKeywords', 'seoAuthor',
           'canonicalBaseUrl', 'seoRobotsPolicy',
           'googleSiteVerification', 'googleVerificationFile',
@@ -312,43 +437,19 @@ service cloud.firestore {
           'socialShareImageAlt', 'twitterHandle', 'fbAppId', 'showRecipeShareButton',
           'contactEmail', 'contactPhone', 'contactAddress', 'footerNote', 'updatedAt'
         ]) &&
-        data.siteName is string && data.siteName.size() >= 2 && data.siteName.size() <= 60 &&
-        data.tagline is string && data.tagline.size() <= 160 &&
-        (!('announcementText' in data) || (data.announcementText is string && data.announcementText.size() <= 200)) &&
+        data.siteName is string && data.siteName.size() >= 1 && data.siteName.size() <= 80 &&
+        isStrMax(data.tagline, 240) &&
+        isStrMax(data.get('announcementText', ''), 240) &&
         data.showAnnouncement is bool &&
-        (!('paymentBkashNumber' in data) || (data.paymentBkashNumber is string && data.paymentBkashNumber.size() <= 40)) &&
-        (!('paymentNagadNumber' in data) || (data.paymentNagadNumber is string && data.paymentNagadNumber.size() <= 40)) &&
-        (!('paymentInstructions' in data) || (data.paymentInstructions is string && data.paymentInstructions.size() <= 400)) &&
-        (!('recipeFontDesktop' in data) || (data.recipeFontDesktop is string && data.recipeFontDesktop in ['bensen', 'atma', 'tiro-italic', 'noto-serif', 'tiro', 'hind-siliguri', 'noto-sans'])) &&
-        (!('recipeFontMobile' in data) || (data.recipeFontMobile is string && data.recipeFontMobile in ['bensen', 'atma', 'tiro-italic', 'noto-serif', 'tiro', 'hind-siliguri', 'noto-sans'])) &&
-        (!('recipeFontSizeDesktop' in data) || (data.recipeFontSizeDesktop is string && data.recipeFontSizeDesktop in ['sm', 'md', 'lg', 'xl'])) &&
-        (!('recipeFontSizeMobile' in data) || (data.recipeFontSizeMobile is string && data.recipeFontSizeMobile in ['sm', 'md', 'lg', 'xl'])) &&
-        (!('adminFontFamily' in data) || (data.adminFontFamily is string && data.adminFontFamily in ['bensen', 'atma', 'tiro-italic', 'noto-serif', 'tiro', 'hind-siliguri', 'noto-sans'])) &&
-        (!('adminFontSize' in data) || (data.adminFontSize is string && data.adminFontSize in ['sm', 'md', 'lg', 'xl'])) &&
-        (!('profileFontFamily' in data) || (data.profileFontFamily is string && data.profileFontFamily in ['bensen', 'atma', 'tiro-italic', 'noto-serif', 'tiro', 'hind-siliguri', 'noto-sans'])) &&
-        (!('profileFontSize' in data) || (data.profileFontSize is string && data.profileFontSize in ['sm', 'md', 'lg', 'xl'])) &&
-        (!('seoTitle' in data) || (data.seoTitle is string && data.seoTitle.size() <= 120)) &&
-        (!('seoDescription' in data) || (data.seoDescription is string && data.seoDescription.size() <= 320)) &&
-        (!('seoKeywords' in data) || (data.seoKeywords is string && data.seoKeywords.size() <= 500)) &&
-        (!('seoAuthor' in data) || (data.seoAuthor is string && data.seoAuthor.size() <= 100)) &&
-        (!('canonicalBaseUrl' in data) || (data.canonicalBaseUrl is string && data.canonicalBaseUrl.size() <= 200)) &&
-        (!('seoRobotsPolicy' in data) || (data.seoRobotsPolicy is string && data.seoRobotsPolicy in ['index, follow', 'noindex, nofollow'])) &&
-        (!('googleSiteVerification' in data) || (data.googleSiteVerification is string && data.googleSiteVerification.size() <= 140)) &&
-        (!('googleVerificationFile' in data) || (data.googleVerificationFile is string && data.googleVerificationFile.size() <= 120)) &&
-        (!('bingSiteVerification' in data) || (data.bingSiteVerification is string && data.bingSiteVerification.size() <= 140)) &&
-        (!('googleAnalyticsId' in data) || (data.googleAnalyticsId is string && data.googleAnalyticsId.size() <= 40)) &&
-        (!('robotsTxtExtra' in data) || (data.robotsTxtExtra is string && data.robotsTxtExtra.size() <= 800)) &&
-        (!('socialShareImageUrl' in data) || (data.socialShareImageUrl is string && data.socialShareImageUrl.size() <= 350000)) &&
-        (!('socialShareTitle' in data) || (data.socialShareTitle is string && data.socialShareTitle.size() <= 120)) &&
-        (!('socialShareDescription' in data) || (data.socialShareDescription is string && data.socialShareDescription.size() <= 320)) &&
-        (!('socialShareImageAlt' in data) || (data.socialShareImageAlt is string && data.socialShareImageAlt.size() <= 160)) &&
-        (!('twitterHandle' in data) || (data.twitterHandle is string && data.twitterHandle.size() <= 60)) &&
-        (!('fbAppId' in data) || (data.fbAppId is string && data.fbAppId.size() <= 40)) &&
-        (!('showRecipeShareButton' in data) || data.showRecipeShareButton is bool) &&
-        data.contactEmail is string && data.contactEmail.size() <= 120 &&
-        data.contactPhone is string && data.contactPhone.size() <= 40 &&
-        data.contactAddress is string && data.contactAddress.size() <= 200 &&
-        (!('footerNote' in data) || (data.footerNote is string && data.footerNote.size() <= 240)) &&
+        isStrMax(data.get('paymentBkashNumber', ''), 60) &&
+        isStrMax(data.get('paymentNagadNumber', ''), 60) &&
+        isStrMax(data.get('paymentInstructions', ''), 600) &&
+        isValidSiteFonts(data) &&
+        isValidSiteSeoAndSocial(data) &&
+        isStrMax(data.contactEmail, 140) &&
+        isStrMax(data.contactPhone, 60) &&
+        isStrMax(data.contactAddress, 240) &&
+        isStrMax(data.get('footerNote', ''), 320) &&
         data.updatedAt is timestamp;
     }
 
@@ -371,19 +472,51 @@ service cloud.firestore {
         data.createdAt is timestamp;
     }
 
+    function isValidRecycleBinItem(data) {
+      return data.keys().hasAll([
+          'itemType', 'originalId', 'title', 'payloadJson',
+          'deletedByUid', 'deletedByName', 'deletedAt', 'expiresAt'
+        ]) &&
+        data.keys().hasOnly([
+          'itemType', 'originalId', 'title', 'subtitle', 'category',
+          'payloadJson', 'deletedByUid', 'deletedByName', 'deletedAt', 'expiresAt'
+        ]) &&
+        data.itemType in ['recipe', 'tip', 'blog'] &&
+        isValidId(data.originalId) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+        isStrMax(data.get('subtitle', ''), 320) &&
+        isStrMax(data.get('category', ''), 60) &&
+        data.payloadJson is string && data.payloadJson.size() >= 2 && data.payloadJson.size() <= 900000 &&
+        isValidId(data.deletedByUid) &&
+        data.deletedByName is string && data.deletedByName.size() <= 100 &&
+        data.deletedAt is timestamp &&
+        data.expiresAt is timestamp;
+    }
+
     // 1. Recipes catalog & gated content subcollection
     match /recipes/{recipeId} {
       allow list: if true;
       allow get: if isValidId(recipeId);
-      allow create: if isValidId(recipeId) && isAdmin() && isValidRecipe(incoming()) &&
-        incoming().createdAt == request.time && incoming().updatedAt == request.time;
-      allow update: if isValidId(recipeId) && isAdmin() && isValidRecipe(incoming()) &&
-        incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow create: if isValidId(recipeId) && isValidRecipe(incoming()) &&
+        incoming().createdAt == request.time && incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (isModerator() && incoming().get('createdByUid', '') == request.auth.uid)
+        );
+      allow update: if isValidId(recipeId) && isValidRecipe(incoming()) &&
+        incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            isModerator() &&
+            existing().get('createdByUid', '') == request.auth.uid &&
+            incoming().get('createdByUid', '') == existing().get('createdByUid', '')
+          )
+        );
       allow delete: if isValidId(recipeId) && isAdmin();
 
       match /content/detail {
         allow get: if isValidId(recipeId) && (
           isAdmin() ||
+          (isModerator() && get(/databases/$(database)/documents/recipes/$(recipeId)).data.get('createdByUid', '') == request.auth.uid) ||
           (
             get(/databases/$(database)/documents/recipes/$(recipeId)).data.isPremium == false && (
               !isSignedIn() ||
@@ -406,8 +539,11 @@ service cloud.firestore {
             )
           )
         );
-        allow create, update: if isValidId(recipeId) && isAdmin() && isValidRecipeContent(incoming()) &&
-          incoming().updatedAt == request.time;
+        allow create, update: if isValidId(recipeId) && isValidRecipeContent(incoming()) &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (isModerator() && getAfter(/databases/$(database)/documents/recipes/$(recipeId)).data.get('createdByUid', '') == request.auth.uid)
+          );
         allow delete: if isValidId(recipeId) && isAdmin();
       }
 
@@ -429,9 +565,9 @@ service cloud.firestore {
     match /categories/{categoryId} {
       allow list: if true;
       allow get: if isValidId(categoryId);
-      allow create: if isValidId(categoryId) && isAdmin() && isValidCategory(incoming()) &&
+      allow create: if isValidId(categoryId) && (isAdmin() || isModerator()) && isValidCategory(incoming()) &&
         incoming().createdAt == request.time && incoming().updatedAt == request.time;
-      allow update: if isValidId(categoryId) && isAdmin() && isValidCategory(incoming()) &&
+      allow update: if isValidId(categoryId) && (isAdmin() || isModerator()) && isValidCategory(incoming()) &&
         incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
       allow delete: if isValidId(categoryId) && isAdmin();
     }
@@ -456,6 +592,7 @@ service cloud.firestore {
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time && (
           (incoming().role == 'member' && incoming().subscriptionPlan == 'basic') ||
+          (incoming().role == 'moderator' && incoming().subscriptionPlan == 'basic' && isBootstrappedModerator()) ||
           isBootstrappedAdmin()
         );
       allow update: if isValidId(userId) && isSignedIn() && isValidUser(incoming()) &&
@@ -464,12 +601,19 @@ service cloud.firestore {
         incoming().updatedAt == request.time && (
           isAdmin() ||
           (
+            isBootstrappedModerator() &&
+            isOwner(userId) &&
+            incoming().role == 'moderator' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['role', 'updatedAt'])
+          ) ||
+          (
             isOwner(userId) &&
             incoming().role == existing().role &&
             incoming().diff(existing()).affectedKeys().hasOnly([
               'displayName', 'photoURL', 'phoneNumber', 'address', 'age', 'favoriteRecipeIds',
               'freeUnlockedRecipeIds', 'premiumUnlockedRecipeIds',
-              'viewedHistory', 'updatedAt'
+              'viewedHistory', 'isOnline', 'lastActiveAt', 'lastLoginDevice', 'lastLoginLocation',
+              'updatedAt'
             ]) &&
             incoming().subscriptionPlan == existing().subscriptionPlan &&
             incoming().subscriptionStatus == existing().subscriptionStatus &&
@@ -551,10 +695,20 @@ service cloud.firestore {
     match /tips/{tipId} {
       allow list: if true;
       allow get: if isValidId(tipId);
-      allow create: if isValidId(tipId) && isAdmin() && isValidTip(incoming()) &&
-        incoming().createdAt == request.time && incoming().updatedAt == request.time;
-      allow update: if isValidId(tipId) && isAdmin() && isValidTip(incoming()) &&
-        incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow create: if isValidId(tipId) && isValidTip(incoming()) &&
+        incoming().createdAt == request.time && incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (isModerator() && incoming().get('createdByUid', '') == request.auth.uid)
+        );
+      allow update: if isValidId(tipId) && isValidTip(incoming()) &&
+        incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            isModerator() &&
+            existing().get('createdByUid', '') == request.auth.uid &&
+            incoming().get('createdByUid', '') == existing().get('createdByUid', '')
+          )
+        );
       allow delete: if isValidId(tipId) && isAdmin();
     }
 
@@ -562,10 +716,20 @@ service cloud.firestore {
     match /blogPosts/{postId} {
       allow list: if true;
       allow get: if isValidId(postId);
-      allow create: if isValidId(postId) && isAdmin() && isValidBlogPost(incoming()) &&
-        incoming().createdAt == request.time && incoming().updatedAt == request.time;
-      allow update: if isValidId(postId) && isAdmin() && isValidBlogPost(incoming()) &&
-        incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow create: if isValidId(postId) && isValidBlogPost(incoming()) &&
+        incoming().createdAt == request.time && incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (isModerator() && incoming().get('createdByUid', '') == request.auth.uid)
+        );
+      allow update: if isValidId(postId) && isValidBlogPost(incoming()) &&
+        incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            isModerator() &&
+            existing().get('createdByUid', '') == request.auth.uid &&
+            incoming().get('createdByUid', '') == existing().get('createdByUid', '')
+          )
+        );
       allow delete: if isValidId(postId) && isAdmin();
     }
 
@@ -598,6 +762,71 @@ service cloud.firestore {
       allow create: if isValidId(userId) && isAdmin() && isValidAdminRecord(incoming()) &&
         incoming().addedBy == request.auth.uid && incoming().createdAt == request.time;
       allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // 10. Moderators Registry
+    match /moderators/{userId} {
+      allow list: if isAdmin();
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow create: if isValidId(userId) && isAdmin() && isValidAdminRecord(incoming()) &&
+        incoming().addedBy == request.auth.uid && incoming().createdAt == request.time;
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // 11. 30-Day Recycle Bin (Admin only)
+    match /recycleBin/{itemId} {
+      allow list: if isAdmin();
+      allow get: if isValidId(itemId) && isAdmin();
+      allow create: if isValidId(itemId) && isAdmin() && isValidRecycleBinItem(incoming()) &&
+        incoming().deletedAt == request.time && incoming().expiresAt > request.time;
+      allow update: if false;
+      allow delete: if isValidId(itemId) && isAdmin();
+    }
+
+    // 12. Direct Two-Way Admin <-> User Messaging
+    match /directThreads/{userId} {
+      allow list: if isAdmin();
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow create: if isValidId(userId) && isSignedIn() &&
+        isValidDirectThread(incoming()) &&
+        incoming().userId == userId &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (isOwner(userId) && incoming().lastSenderRole == 'user' && incoming().unreadByUser == 0)
+        );
+      allow update: if isValidId(userId) && isSignedIn() &&
+        isValidDirectThread(incoming()) &&
+        incoming().userId == existing().userId && (
+          isAdmin() ||
+          (
+            isOwner(userId) && (
+              (
+                incoming().diff(existing()).affectedKeys().hasOnly(['unreadByUser']) &&
+                incoming().unreadByUser == 0
+              ) ||
+              (
+                incoming().lastSenderRole == 'user' &&
+                incoming().unreadByUser == 0 &&
+                incoming().updatedAt == request.time
+              )
+            )
+          )
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+
+      match /messages/{messageId} {
+        allow list: if isValidId(userId) && (isOwner(userId) || isAdmin());
+        allow get: if isValidId(userId) && isValidId(messageId) && (isOwner(userId) || isAdmin());
+        allow create: if isValidId(userId) && isValidId(messageId) && isSignedIn() &&
+          isValidDirectMessage(incoming()) &&
+          incoming().senderUid == request.auth.uid &&
+          incoming().createdAt == request.time && (
+            (isAdmin() && incoming().senderRole == 'admin') ||
+            (isOwner(userId) && incoming().senderRole == 'user')
+          );
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(messageId) && isAdmin();
+      }
     }
   }
 }

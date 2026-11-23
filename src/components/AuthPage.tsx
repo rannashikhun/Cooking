@@ -9,6 +9,7 @@ import {
 import { ArrowLeft, Lock, Phone, User as UserIcon } from 'lucide-react';
 import { auth, googleProvider } from '../firebase';
 import {
+  isBootstrappedModeratorEmail,
   isSuperAdminEmail,
   resolveAuthIdentifier,
   syncUserProfile,
@@ -57,7 +58,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       onNavigate({ page: 'checkout', planId: pendingPlan.id });
     } else if (returnRoute && returnRoute.page !== 'login') {
       onNavigate(returnRoute);
-    } else if (isSuperAdminEmail(userEmail)) {
+    } else if (isSuperAdminEmail(userEmail) || isBootstrappedModeratorEmail(userEmail)) {
       onNavigate({ page: 'admin' });
     } else {
       onNavigate({ page: 'profile' });

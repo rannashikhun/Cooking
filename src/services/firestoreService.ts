@@ -37,12 +37,17 @@ import type {
   RecipeCategory,
   RecipeContent,
   RecipeHistoryEntry,
+  RecycleBinItem,
   SiteSettings,
   SubscriptionPlan,
   UserProfile,
+  UserRole,
 } from '../types';
 
 export const SUPER_ADMIN_EMAIL = 'rannashikhun@gmail.com';
+export const BOOTSTRAPPED_MODERATOR_PHONE = '01764484696';
+export const BOOTSTRAPPED_MODERATOR_EMAIL = 'p8801764484696@phone.rannashikhun.app';
+export const RECYCLE_BIN_RETENTION_DAYS = 30;
 export const FREE_RECIPE_LIMIT = 10;
 export const GUEST_READS_KEY = 'rs_guest_free_recipes';
 export const getUserLocalReadsKey = (uid: string) => `rs_user_reads_${uid}`;
@@ -52,6 +57,14 @@ export const getUserHistoryKey = (uid: string) => `rs_recipe_history_${uid}`;
 
 export function isSuperAdminEmail(email?: string | null): boolean {
   return Boolean(email && email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
+}
+
+export function isBootstrappedModeratorEmail(email?: string | null): boolean {
+  return Boolean(email && email.toLowerCase() === BOOTSTRAPPED_MODERATOR_EMAIL.toLowerCase());
+}
+
+export function canAccessAdminPanel(role?: UserRole | null): boolean {
+  return role === 'admin' || role === 'moderator';
 }
 
 export function getSubscriptionExpiresMillis(ts: unknown): number | null {
@@ -416,6 +429,7 @@ async function syncUserProfileInternal(
   const userRef = doc(db, 'users', firebaseUser.uid);
   const adminCheck = isSuperAdminEmail(firebaseUser.email);
   const isVerifiedSuperAdmin = adminCheck && firebaseUser.emailVerified;
+  const isBootstrappedMod = isBootstrappedModeratorEmail(firebaseUser.email);
 
   if (firebaseUser.emailVerified) {
     try {
@@ -454,11 +468,17 @@ async function syncUserProfileInternal(
       (derivedPhone ? `সদস্য (${derivedPhone})` : firebaseUser.email?.split('@')[0]) ||
       'অতিথি রাঁধুনি';
 
+    const initialRole: UserRole = isVerifiedSuperAdmin
+      ? 'admin'
+      : isBootstrappedMod
+        ? 'moderator'
+        : 'member';
+
     const newProfile: Record<string, unknown> = {
       uid: firebaseUser.uid,
       displayName: resolvedName,
       email: firebaseUser.email || '',
-      role: isVerifiedSuperAdmin ? 'admin' : 'member',
+      role: initialRole,
       subscriptionPlan: isVerifiedSuperAdmin ? 'pro' : 'basic',
       subscriptionStatus: 'active',
       favoriteRecipeIds: [],
@@ -494,7 +514,7 @@ async function syncUserProfileInternal(
       email: newProfile.email as string,
       phoneNumber: derivedPhone,
       photoURL: firebaseUser.photoURL || undefined,
-      role: isVerifiedSuperAdmin ? 'admin' : 'member',
+      role: initialRole,
       subscriptionPlan: isVerifiedSuperAdmin ? 'pro' : 'basic',
       subscriptionStatus: 'active',
       favoriteRecipeIds: [],
@@ -517,6 +537,16 @@ async function syncUserProfileInternal(
     }
   }
 
+  let isModeratorDoc = false;
+  if (!isVerifiedSuperAdmin && !isAdminDoc) {
+    try {
+      const modSnap = await getDoc(doc(db, 'moderators', firebaseUser.uid));
+      isModeratorDoc = modSnap.exists();
+    } catch {
+      isModeratorDoc = false;
+    }
+  }
+
   if (
     isVerifiedSuperAdmin &&
     (data.role !== 'admin' || data.subscriptionPlan !== 'pro' || data.subscriptionStatus !== 'active')
@@ -531,12 +561,23 @@ async function syncUserProfileInternal(
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${firebaseUser.uid}`);
     }
+  } else if (isBootstrappedMod && data.role !== 'moderator') {
+    try {
+      await updateDoc(userRef, {
+        role: 'moderator',
+        updatedAt: serverTimestamp(),
+      });
+    } catch {
+      // Non-fatal if rule sync lags; effectiveRole still grants moderator UI access
+    }
   }
 
-  const effectiveRole =
+  const effectiveRole: UserRole =
     isVerifiedSuperAdmin || (firebaseUser.emailVerified && (isAdminDoc || data.role === 'admin'))
       ? 'admin'
-      : 'member';
+      : isBootstrappedMod || isModeratorDoc || data.role === 'moderator'
+        ? 'moderator'
+        : 'member';
 
   const existingFreeUnlocked = Array.isArray(data.freeUnlockedRecipeIds)
     ? data.freeUnlockedRecipeIds
@@ -1645,7 +1686,8 @@ export const MAX_HERO_RECIPES = 5;
 export async function saveRecipeAdmin(
   recipeData: Omit<Recipe, 'createdAt' | 'updatedAt'>,
   contentData: Omit<RecipeContent, 'updatedAt'>,
-  isNew: boolean
+  isNew: boolean,
+  allowFeaturedOverflow = true
 ): Promise<void> {
   const { id: recipeId, ...recipeFields } = recipeData;
   const cleanRecipe = Object.fromEntries(
@@ -1679,8 +1721,8 @@ export async function saveRecipeAdmin(
     }
 
     // Keep at most 5 hero recipes: when adding/marking a recipe for Hero Slider,
-    // automatically unmark the oldest featured recipe(s) beyond 5.
-    if (recipeData.isFeatured) {
+    // automatically unmark the oldest featured recipe(s) beyond 5 (Admin only).
+    if (recipeData.isFeatured && allowFeaturedOverflow) {
       const allSnap = await getDocsFromServer(collection(db, 'recipes')).catch(() =>
         getDocs(collection(db, 'recipes'))
       );
@@ -1730,6 +1772,200 @@ export async function deleteRecipeAdmin(recipeId: string): Promise<void> {
     await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `recipes/${recipeId}`);
+  }
+}
+
+function buildRecycleBinExpiry(): Timestamp {
+  return Timestamp.fromDate(
+    new Date(Date.now() + RECYCLE_BIN_RETENTION_DAYS * 24 * 60 * 60 * 1000)
+  );
+}
+
+export async function moveRecipeToRecycleBinAdmin(
+  recipe: Recipe,
+  deletedBy: { uid: string; name: string }
+): Promise<void> {
+  const trashId = `trash_recipe_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  try {
+    const { content } = await fetchRecipeContent(recipe.id, recipe.isPremium, true);
+    const { createdAt: _cAt, updatedAt: _uAt, ...recipeSnapshot } = recipe;
+    const cleanRecipeSnapshot = Object.fromEntries(
+      Object.entries(recipeSnapshot).filter(([, v]) => v !== undefined)
+    );
+    const cleanContentSnapshot = content
+      ? Object.fromEntries(
+          Object.entries({
+            ingredients: Array.isArray(content.ingredients) ? content.ingredients : [],
+            steps: Array.isArray(content.steps) ? content.steps : [],
+            stepImages: Array.isArray(content.stepImages) ? content.stepImages : [],
+            chefTip: content.chefTip || '',
+          }).filter(([, v]) => v !== undefined)
+        )
+      : { ingredients: [], steps: [], stepImages: [], chefTip: '' };
+
+    const payloadJson = JSON.stringify({
+      recipe: cleanRecipeSnapshot,
+      content: cleanContentSnapshot,
+    });
+
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'recycleBin', trashId), {
+      itemType: 'recipe',
+      originalId: recipe.id,
+      title: (recipe.title || 'রেসিপি').slice(0, 160),
+      subtitle: (recipe.subtitle || '').slice(0, 320),
+      category: (recipe.category || '').slice(0, 60),
+      payloadJson,
+      deletedByUid: deletedBy.uid,
+      deletedByName: (deletedBy.name || 'এডমিন').slice(0, 100),
+      deletedAt: serverTimestamp(),
+      expiresAt: buildRecycleBinExpiry(),
+    });
+    batch.delete(doc(db, 'recipes', recipe.id, 'content', 'detail'));
+    batch.delete(doc(db, 'recipes', recipe.id));
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `recycleBin/${trashId}`);
+  }
+}
+
+export async function moveTipToRecycleBinAdmin(
+  tip: CookingTip,
+  deletedBy: { uid: string; name: string }
+): Promise<void> {
+  const trashId = `trash_tip_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  try {
+    const { createdAt: _cAt, updatedAt: _uAt, ...tipSnapshot } = tip;
+    const cleanTipSnapshot = Object.fromEntries(
+      Object.entries(tipSnapshot).filter(([, v]) => v !== undefined)
+    );
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'recycleBin', trashId), {
+      itemType: 'tip',
+      originalId: tip.id,
+      title: (tip.title || 'টিপস').slice(0, 160),
+      subtitle: (tip.summary || '').slice(0, 320),
+      category: (tip.category || '').slice(0, 60),
+      payloadJson: JSON.stringify(cleanTipSnapshot),
+      deletedByUid: deletedBy.uid,
+      deletedByName: (deletedBy.name || 'এডমিন').slice(0, 100),
+      deletedAt: serverTimestamp(),
+      expiresAt: buildRecycleBinExpiry(),
+    });
+    batch.delete(doc(db, 'tips', tip.id));
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `recycleBin/${trashId}`);
+  }
+}
+
+export async function moveBlogToRecycleBinAdmin(
+  post: BlogPost,
+  deletedBy: { uid: string; name: string }
+): Promise<void> {
+  const trashId = `trash_blog_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  try {
+    const { createdAt: _cAt, updatedAt: _uAt, ...blogSnapshot } = post;
+    const cleanBlogSnapshot = Object.fromEntries(
+      Object.entries(blogSnapshot).filter(([, v]) => v !== undefined)
+    );
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'recycleBin', trashId), {
+      itemType: 'blog',
+      originalId: post.id,
+      title: (post.title || 'ব্লগ পোস্ট').slice(0, 160),
+      subtitle: (post.excerpt || '').slice(0, 320),
+      category: (post.category || '').slice(0, 60),
+      payloadJson: JSON.stringify(cleanBlogSnapshot),
+      deletedByUid: deletedBy.uid,
+      deletedByName: (deletedBy.name || 'এডমিন').slice(0, 100),
+      deletedAt: serverTimestamp(),
+      expiresAt: buildRecycleBinExpiry(),
+    });
+    batch.delete(doc(db, 'blogPosts', post.id));
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `recycleBin/${trashId}`);
+  }
+}
+
+export async function restoreRecycleBinItemAdmin(item: RecycleBinItem): Promise<void> {
+  try {
+    const parsed = JSON.parse(item.payloadJson) as Record<string, unknown>;
+    const batch = writeBatch(db);
+
+    if (item.itemType === 'recipe') {
+      const recipeObj = (parsed.recipe || {}) as Record<string, unknown>;
+      const contentObj = (parsed.content || {}) as Record<string, unknown>;
+      const { id: _rId, createdAt: _cAt, updatedAt: _uAt, ...restRecipe } = recipeObj;
+      const cleanRecipe = Object.fromEntries(
+        Object.entries(restRecipe).filter(([, v]) => v !== undefined)
+      );
+      const { updatedAt: _cuAt, ...restContent } = contentObj;
+      const cleanContent = Object.fromEntries(
+        Object.entries({
+          ingredients: Array.isArray(restContent.ingredients) ? restContent.ingredients : [],
+          steps: Array.isArray(restContent.steps) ? restContent.steps : [],
+          stepImages: Array.isArray(restContent.stepImages) ? restContent.stepImages : [],
+          chefTip: typeof restContent.chefTip === 'string' ? restContent.chefTip : '',
+        }).filter(([, v]) => v !== undefined)
+      );
+      batch.set(doc(db, 'recipes', item.originalId), {
+        ...cleanRecipe,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      batch.set(doc(db, 'recipes', item.originalId, 'content', 'detail'), {
+        ...cleanContent,
+        updatedAt: serverTimestamp(),
+      });
+    } else if (item.itemType === 'tip') {
+      const { id: _tId, createdAt: _cAt, updatedAt: _uAt, ...restTip } = parsed;
+      const cleanTip = Object.fromEntries(
+        Object.entries(restTip).filter(([, v]) => v !== undefined)
+      );
+      batch.set(doc(db, 'tips', item.originalId), {
+        ...cleanTip,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } else if (item.itemType === 'blog') {
+      const { id: _bId, createdAt: _cAt, updatedAt: _uAt, ...restBlog } = parsed;
+      const cleanBlog = Object.fromEntries(
+        Object.entries(restBlog).filter(([, v]) => v !== undefined)
+      );
+      batch.set(doc(db, 'blogPosts', item.originalId), {
+        ...cleanBlog,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    batch.delete(doc(db, 'recycleBin', item.id));
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `recycleBin/${item.id}`);
+  }
+}
+
+export async function permanentlyDeleteRecycleBinItemAdmin(trashId: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, 'recycleBin', trashId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `recycleBin/${trashId}`);
+  }
+}
+
+export async function purgeRecycleBinItemsAdmin(trashIds: string[]): Promise<void> {
+  if (trashIds.length === 0) return;
+  try {
+    const batch = writeBatch(db);
+    for (const id of trashIds.slice(0, 200)) {
+      batch.delete(doc(db, 'recycleBin', id));
+    }
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, 'recycleBin');
   }
 }
 
@@ -1796,6 +2032,9 @@ export async function savePlanAdmin(plan: Omit<SubscriptionPlan, 'updatedAt'>): 
 
 export async function saveTipAdmin(tip: Omit<CookingTip, 'createdAt' | 'updatedAt'>, isNew: boolean): Promise<void> {
   const { id: tipId, ...tipFields } = tip;
+  const cleanTip = Object.fromEntries(
+    Object.entries(tipFields).filter(([, v]) => v !== undefined)
+  );
   try {
     const ref = doc(db, 'tips', tipId);
     let shouldCreate = isNew;
@@ -1804,9 +2043,9 @@ export async function saveTipAdmin(tip: Omit<CookingTip, 'createdAt' | 'updatedA
       if (!snap.exists()) shouldCreate = true;
     }
     if (shouldCreate) {
-      await setDoc(ref, { ...tipFields, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      await setDoc(ref, { ...cleanTip, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
     } else {
-      await updateDoc(ref, { ...tipFields, updatedAt: serverTimestamp() });
+      await updateDoc(ref, { ...cleanTip, updatedAt: serverTimestamp() });
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `tips/${tipId}`);
@@ -1823,6 +2062,9 @@ export async function deleteTipAdmin(tipId: string): Promise<void> {
 
 export async function saveBlogAdmin(post: Omit<BlogPost, 'createdAt' | 'updatedAt'>, isNew: boolean): Promise<void> {
   const { id: postId, ...blogFields } = post;
+  const cleanBlog = Object.fromEntries(
+    Object.entries(blogFields).filter(([, v]) => v !== undefined)
+  );
   try {
     const ref = doc(db, 'blogPosts', postId);
     let shouldCreate = isNew;
@@ -1831,9 +2073,9 @@ export async function saveBlogAdmin(post: Omit<BlogPost, 'createdAt' | 'updatedA
       if (!snap.exists()) shouldCreate = true;
     }
     if (shouldCreate) {
-      await setDoc(ref, { ...blogFields, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      await setDoc(ref, { ...cleanBlog, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
     } else {
-      await updateDoc(ref, { ...blogFields, updatedAt: serverTimestamp() });
+      await updateDoc(ref, { ...cleanBlog, updatedAt: serverTimestamp() });
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `blogPosts/${postId}`);
@@ -1853,7 +2095,7 @@ export async function updateUserByAdmin(
   updates: {
     subscriptionPlan: PlanTier;
     subscriptionStatus: 'active' | 'expired';
-    role: 'member' | 'admin';
+    role?: UserRole;
     email: string;
     currentAdminUid: string;
   },
@@ -1863,11 +2105,16 @@ export async function updateUserByAdmin(
     const userRef = doc(db, 'users', targetUid);
     const snap = await getDoc(userRef);
     const existingData = snap.exists() ? (snap.data() as UserProfile) : null;
+    const resolvedRole: UserRole =
+      updates.role ??
+      (isBootstrappedModeratorEmail(updates.email)
+        ? 'moderator'
+        : existingData?.role || 'member');
 
     const userPatch: Record<string, unknown> = {
       subscriptionPlan: updates.subscriptionPlan,
       subscriptionStatus: updates.subscriptionStatus,
-      role: updates.role,
+      role: resolvedRole,
       updatedAt: serverTimestamp(),
     };
 
@@ -1901,14 +2148,16 @@ export async function updateUserByAdmin(
 
     const batch = writeBatch(db);
     batch.update(userRef, userPatch);
-    if (updates.role === 'admin') {
-      batch.set(doc(db, 'admins', targetUid), {
-        email: updates.email,
-        addedBy: updates.currentAdminUid,
-        createdAt: serverTimestamp(),
-      });
-    } else if (!isSuperAdminEmail(updates.email)) {
-      batch.delete(doc(db, 'admins', targetUid));
+    if (updates.role !== undefined) {
+      if (resolvedRole === 'admin') {
+        batch.set(doc(db, 'admins', targetUid), {
+          email: updates.email,
+          addedBy: updates.currentAdminUid,
+          createdAt: serverTimestamp(),
+        });
+      } else if (!isSuperAdminEmail(updates.email)) {
+        batch.delete(doc(db, 'admins', targetUid));
+      }
     }
     await batch.commit();
   } catch (error) {
@@ -1916,10 +2165,58 @@ export async function updateUserByAdmin(
   }
 }
 
+export async function deleteUserAccountAdmin(
+  targetUid: string,
+  targetEmail?: string
+): Promise<void> {
+  if (!targetUid) return;
+  if (isSuperAdminEmail(targetEmail) || auth.currentUser?.uid === targetUid) {
+    throw new Error('সুপার এডমিন বা নিজের অ্যাকাউন্ট ডিলিট করা যাবে না।');
+  }
+  try {
+    // Delete user's notifications subcollection first (in safe chunks)
+    const notifCol = collection(db, 'users', targetUid, 'notifications');
+    const notifSnap = await getDocs(notifCol);
+    const notifDocs = notifSnap.docs;
+    for (let i = 0; i < notifDocs.length; i += 400) {
+      const chunkBatch = writeBatch(db);
+      notifDocs.slice(i, i + 400).forEach((d) => chunkBatch.delete(d.ref));
+      await chunkBatch.commit();
+    }
+
+    // Delete user's direct message subcollection & thread if present
+    try {
+      const dmCol = collection(db, 'directThreads', targetUid, 'messages');
+      const dmSnap = await getDocs(dmCol);
+      const dmDocs = dmSnap.docs;
+      for (let i = 0; i < dmDocs.length; i += 400) {
+        const chunkBatch = writeBatch(db);
+        dmDocs.slice(i, i + 400).forEach((d) => chunkBatch.delete(d.ref));
+        await chunkBatch.commit();
+      }
+    } catch {
+      // Ignore if thread does not exist
+    }
+
+    // Delete user document and any role registry records
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'users', targetUid));
+    batch.delete(doc(db, 'admins', targetUid));
+    batch.delete(doc(db, 'moderators', targetUid));
+    batch.delete(doc(db, 'directThreads', targetUid));
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `users/${targetUid}`);
+  }
+}
+
 export async function saveSiteSettingsAdmin(settings: Omit<SiteSettings, 'updatedAt'>): Promise<void> {
+  const cleanSettings = Object.fromEntries(
+    Object.entries(settings).filter(([, v]) => v !== undefined)
+  );
   try {
     await setDoc(doc(db, 'siteSettings', 'main'), {
-      ...settings,
+      ...cleanSettings,
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
@@ -1955,3 +2252,320 @@ export async function deleteMessageAdmin(messageId: string): Promise<void> {
     handleFirestoreError(error, OperationType.DELETE, `contactMessages/${messageId}`);
   }
 }
+
+// ============================================================
+// Online / Offline Presence, Login Device & Area Detection
+// ============================================================
+
+export const PRESENCE_ONLINE_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
+const SESSION_LOCATION_CACHE_KEY = 'rs_client_login_location_v1';
+
+export function isUserOnlineNow(
+  user: Pick<UserProfile, 'isOnline' | 'lastActiveAt'> | null | undefined,
+  nowMs: number = Date.now()
+): boolean {
+  if (!user || user.isOnline !== true) return false;
+  const lastMs = getSubscriptionExpiresMillis(user.lastActiveAt);
+  if (lastMs === null) return false;
+  return nowMs - lastMs <= PRESENCE_ONLINE_WINDOW_MS;
+}
+
+export function formatRelativePresenceBn(
+  user: Pick<UserProfile, 'isOnline' | 'lastActiveAt'> | null | undefined,
+  nowMs: number = Date.now()
+): string {
+  if (isUserOnlineNow(user, nowMs)) return 'এখন অনলাইন';
+  const lastMs = getSubscriptionExpiresMillis(user?.lastActiveAt);
+  if (!lastMs) return 'অফলাইন';
+
+  const toBn = (n: number) =>
+    String(n).replace(/\d/g, (d) => ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'][Number(d)]);
+
+  const diffSec = Math.max(0, Math.floor((nowMs - lastMs) / 1000));
+  if (diffSec < 60) return 'এইমাত্র অফলাইন';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${toBn(diffMin)} মিনিট আগে সক্রিয়`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${toBn(diffHr)} ঘণ্টা আগে সক্রিয়`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay <= 30) return `${toBn(diffDay)} দিন আগে সক্রিয়`;
+  return new Date(lastMs).toLocaleDateString('bn-BD', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+export function detectClientDeviceLabel(): string {
+  if (typeof navigator === 'undefined') return 'অজানা ডিভাইস';
+  const ua = navigator.userAgent || '';
+
+  const isIPad = /iPad/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+  const isIPhone = /iPhone|iPod/i.test(ua);
+  const isAndroid = /Android/i.test(ua);
+  const isMobile = isIPhone || (isAndroid && /Mobile/i.test(ua)) || /Mobile|IEMobile|Opera Mini/i.test(ua);
+  const isTablet = isIPad || (isAndroid && !/Mobile/i.test(ua));
+
+  const deviceType = isIPhone
+    ? 'আইফোন'
+    : isIPad
+      ? 'আইপ্যাড'
+      : isTablet
+        ? 'ট্যাবলেট'
+        : isMobile
+          ? 'মোবাইল'
+          : 'ডেস্কটপ';
+
+  let os = 'অন্যান্য OS';
+  if (/Windows/i.test(ua)) os = 'Windows';
+  else if (isAndroid) os = 'Android';
+  else if (isIPhone || isIPad) os = 'iOS';
+  else if (/Mac OS X|Macintosh/i.test(ua)) os = 'macOS';
+  else if (/CrOS/i.test(ua)) os = 'ChromeOS';
+  else if (/Linux/i.test(ua)) os = 'Linux';
+
+  let browser = 'ব্রাউজার';
+  if (/Edg\//i.test(ua)) browser = 'Edge';
+  else if (/OPR\/|Opera/i.test(ua)) browser = 'Opera';
+  else if (/SamsungBrowser/i.test(ua)) browser = 'Samsung Internet';
+  else if (/Firefox|FxiOS/i.test(ua)) browser = 'Firefox';
+  else if (/CriOS|Chrome/i.test(ua)) browser = 'Chrome';
+  else if (/Safari/i.test(ua)) browser = 'Safari';
+
+  return `${deviceType} · ${os} · ${browser}`.slice(0, 160);
+}
+
+function getTimezoneFallbackLocation(): string {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    if (tz === 'Asia/Dhaka') return 'বাংলাদেশ (ঢাকা টাইমজোন)';
+    if (tz === 'Asia/Kolkata' || tz === 'Asia/Calcutta') return 'ভারত (কলকাতা টাইমজোন)';
+    if (tz) return `${tz.replace(/_/g, ' ')}`;
+  } catch {
+    // Ignore Intl errors
+  }
+  return 'অজানা এলাকা';
+}
+
+export async function detectClientLocationLabel(): Promise<string> {
+  try {
+    const cached = sessionStorage.getItem(SESSION_LOCATION_CACHE_KEY);
+    if (cached && cached.trim()) return cached.trim().slice(0, 160);
+  } catch {
+    // Ignore storage issues
+  }
+
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 3200);
+  try {
+    const res = await fetch('https://ipwho.is/?fields=success,city,region,country', {
+      signal: controller.signal,
+    });
+    if (res.ok) {
+      const data = (await res.json()) as {
+        success?: boolean;
+        city?: string;
+        region?: string;
+        country?: string;
+      };
+      if (data && data.success !== false) {
+        const parts = [data.city, data.region && data.region !== data.city ? data.region : '', data.country]
+          .map((s) => (s || '').trim())
+          .filter(Boolean);
+        if (parts.length > 0) {
+          const label = parts.join(', ').slice(0, 160);
+          try {
+            sessionStorage.setItem(SESSION_LOCATION_CACHE_KEY, label);
+          } catch {
+            // Ignore storage issues
+          }
+          return label;
+        }
+      }
+    }
+  } catch {
+    // Fallback to timezone below
+  } finally {
+    window.clearTimeout(timer);
+  }
+
+  const fallback = getTimezoneFallbackLocation().slice(0, 160);
+  try {
+    sessionStorage.setItem(SESSION_LOCATION_CACHE_KEY, fallback);
+  } catch {
+    // Ignore storage issues
+  }
+  return fallback;
+}
+
+export async function updateUserPresence(
+  uid: string,
+  options: { isOnline: boolean; includeMeta?: boolean }
+): Promise<void> {
+  if (!uid) return;
+  try {
+    const patch: Record<string, unknown> = {
+      isOnline: Boolean(options.isOnline),
+      lastActiveAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    if (options.includeMeta) {
+      patch.lastLoginDevice = detectClientDeviceLabel();
+      const loc = await detectClientLocationLabel();
+      if (loc) {
+        patch.lastLoginLocation = loc;
+      }
+    }
+    await updateDoc(doc(db, 'users', uid), patch);
+  } catch {
+    // Silent: presence writes should never interrupt user workflow
+  }
+}
+
+// ============================================================
+// Direct Two-Way Messaging (Admin <-> User)
+// ============================================================
+
+export async function sendDirectMessageAsAdmin(params: {
+  targetUser: Pick<UserProfile, 'uid' | 'displayName' | 'email' | 'phoneNumber' | 'photoURL'>;
+  adminUser: Pick<UserProfile, 'uid' | 'displayName'>;
+  text: string;
+}): Promise<void> {
+  const cleanText = params.text.trim().slice(0, 1000);
+  if (!cleanText) return;
+
+  const targetUid = params.targetUser.uid;
+  const msgId = `dm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const notifId = `ntf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const threadRef = doc(db, 'directThreads', targetUid);
+
+  try {
+    let prevUnreadByUser = 0;
+    try {
+      const existingSnap = await getDoc(threadRef);
+      if (existingSnap.exists()) {
+        const d = existingSnap.data();
+        if (typeof d.unreadByUser === 'number' && d.unreadByUser >= 0) {
+          prevUnreadByUser = Math.min(9999, Math.round(d.unreadByUser));
+        }
+      }
+    } catch {
+      // Treat as new thread
+    }
+
+    const threadPayload: Record<string, unknown> = {
+      userId: targetUid,
+      userName: (params.targetUser.displayName || 'সদস্য').slice(0, 100),
+      userContact: formatUserContact(params.targetUser.email, params.targetUser.phoneNumber).slice(0, 160),
+      lastMessage: cleanText,
+      lastSenderRole: 'admin',
+      unreadByAdmin: 0,
+      unreadByUser: prevUnreadByUser + 1,
+      updatedAt: serverTimestamp(),
+    };
+    if (params.targetUser.photoURL && params.targetUser.photoURL.length <= 160000) {
+      threadPayload.userPhotoURL = params.targetUser.photoURL;
+    }
+
+    const senderName = (params.adminUser.displayName || 'এডমিন').slice(0, 100);
+    const notifPreview = cleanText.length > 180 ? `${cleanText.slice(0, 177)}...` : cleanText;
+
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'directThreads', targetUid, 'messages', msgId), {
+      senderUid: params.adminUser.uid,
+      senderName,
+      senderRole: 'admin',
+      text: cleanText,
+      createdAt: serverTimestamp(),
+    });
+    batch.set(threadRef, threadPayload);
+    batch.set(doc(db, 'users', targetUid, 'notifications', notifId), {
+      type: 'admin_message',
+      title: 'এডমিন থেকে নতুন মেসেজ এসেছে',
+      message: notifPreview,
+      senderUid: params.adminUser.uid,
+      senderName,
+      isRead: false,
+      createdAt: serverTimestamp(),
+    });
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `directThreads/${targetUid}/messages/${msgId}`);
+  }
+}
+
+export async function sendDirectMessageAsUser(params: {
+  user: Pick<UserProfile, 'uid' | 'displayName' | 'email' | 'phoneNumber' | 'photoURL'>;
+  text: string;
+}): Promise<void> {
+  const cleanText = params.text.trim().slice(0, 1000);
+  if (!cleanText) return;
+
+  const userId = params.user.uid;
+  const msgId = `dm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const threadRef = doc(db, 'directThreads', userId);
+
+  try {
+    let prevUnreadByAdmin = 0;
+    try {
+      const existingSnap = await getDoc(threadRef);
+      if (existingSnap.exists()) {
+        const d = existingSnap.data();
+        if (typeof d.unreadByAdmin === 'number' && d.unreadByAdmin >= 0) {
+          prevUnreadByAdmin = Math.min(9999, Math.round(d.unreadByAdmin));
+        }
+      }
+    } catch {
+      // Treat as new thread
+    }
+
+    const senderName = (params.user.displayName || 'সদস্য').slice(0, 100);
+    const threadPayload: Record<string, unknown> = {
+      userId,
+      userName: senderName,
+      userContact: formatUserContact(params.user.email, params.user.phoneNumber).slice(0, 160),
+      lastMessage: cleanText,
+      lastSenderRole: 'user',
+      unreadByAdmin: prevUnreadByAdmin + 1,
+      unreadByUser: 0,
+      updatedAt: serverTimestamp(),
+    };
+    if (params.user.photoURL && params.user.photoURL.length <= 160000) {
+      threadPayload.userPhotoURL = params.user.photoURL;
+    }
+
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'directThreads', userId, 'messages', msgId), {
+      senderUid: userId,
+      senderName,
+      senderRole: 'user',
+      text: cleanText,
+      createdAt: serverTimestamp(),
+    });
+    batch.set(threadRef, threadPayload);
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `directThreads/${userId}/messages/${msgId}`);
+  }
+}
+
+export async function markDirectThreadRead(
+  userId: string,
+  reader: 'admin' | 'user'
+): Promise<void> {
+  if (!userId) return;
+  try {
+    const threadRef = doc(db, 'directThreads', userId);
+    const snap = await getDoc(threadRef);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (reader === 'admin' && (Number(data.unreadByAdmin) || 0) > 0) {
+      await updateDoc(threadRef, { unreadByAdmin: 0 });
+    } else if (reader === 'user' && (Number(data.unreadByUser) || 0) > 0) {
+      await updateDoc(threadRef, { unreadByUser: 0 });
+    }
+  } catch {
+    // Non-fatal
+  }
+}
+

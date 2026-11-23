@@ -42,6 +42,7 @@ import {
   getUserFreeUnlockedIds,
   getUserPremiumQuota,
   getUserPremiumUnlockedIds,
+  isBootstrappedModeratorEmail,
   isPaidPlanActive,
   isSuperAdminEmail,
   markAllNotificationsRead,
@@ -54,6 +55,7 @@ import {
   sortRecipesNewestFirst,
   syncUserProfile,
   toggleFavoriteRecipe,
+  updateUserPresence,
 } from './services/firestoreService';
 import {
   resolvePublicAsset,
@@ -61,6 +63,7 @@ import {
   withAppBase,
 } from './utils/appBase';
 import { applyRouteSeoMeta } from './utils/seoMeta';
+import { getResponsiveTypographyClass } from './utils/typography';
 import type {
   ActiveTab,
   BlogPost,
@@ -232,6 +235,9 @@ export default function App() {
     }
   });
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
+  const [unreadDirectMessagesCount, setUnreadDirectMessagesCount] = useState<number>(0);
+  const [profileNotifTab, setProfileNotifTab] = useState<'notifications' | 'messages'>('notifications');
+  const [profileNotifTabNonce, setProfileNotifTabNonce] = useState<number>(0);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
 
@@ -501,6 +507,7 @@ export default function App() {
 
     let userDocUnsub: (() => void) | null = null;
     let notifUnsub: (() => void) | null = null;
+    let directThreadUnsub: (() => void) | null = null;
 
     const unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
       if (userDocUnsub) {
@@ -511,10 +518,15 @@ export default function App() {
         notifUnsub();
         notifUnsub = null;
       }
+      if (directThreadUnsub) {
+        directThreadUnsub();
+        directThreadUnsub = null;
+      }
 
       if (!fbUser) {
         setUser(null);
         setNotifications([]);
+        setUnreadDirectMessagesCount(0);
         setAuthReady(true);
         return;
       }
@@ -545,6 +557,21 @@ export default function App() {
           }
         );
 
+        directThreadUnsub = onSnapshot(
+          doc(db, 'directThreads', fbUser.uid),
+          (snap) => {
+            if (snap.exists()) {
+              const raw = snap.data()?.unreadByUser;
+              setUnreadDirectMessagesCount(typeof raw === 'number' && raw > 0 ? raw : 0);
+            } else {
+              setUnreadDirectMessagesCount(0);
+            }
+          },
+          () => {
+            setUnreadDirectMessagesCount(0);
+          }
+        );
+
         userDocUnsub = onSnapshot(
           doc(db, 'users', fbUser.uid),
           (snap) => {
@@ -553,6 +580,8 @@ export default function App() {
               const verifiedAdmin =
                 fbUser.emailVerified &&
                 (isSuperAdminEmail(fbUser.email) || data.role === 'admin');
+              const isMod =
+                isBootstrappedModeratorEmail(fbUser.email) || data.role === 'moderator';
               setUser((prev) => {
                 if (
                   prev?.lastOrderId &&
@@ -583,9 +612,16 @@ export default function App() {
                   role:
                     verifiedAdmin || (fbUser.emailVerified && prev?.role === 'admin')
                       ? 'admin'
-                      : 'member',
+                      : isMod || prev?.role === 'moderator'
+                        ? 'moderator'
+                        : 'member',
                 };
               });
+            } else if (!snap.metadata.fromCache && !isSuperAdminEmail(fbUser.email)) {
+              clearUserLocalReads(fbUser.uid);
+              setUser(null);
+              setNotifications([]);
+              signOut(auth).catch(() => {});
             }
           },
           () => {}
@@ -601,6 +637,7 @@ export default function App() {
       unsubAuth();
       if (userDocUnsub) userDocUnsub();
       if (notifUnsub) notifUnsub();
+      if (directThreadUnsub) directThreadUnsub();
     };
   }, []);
 
@@ -750,6 +787,49 @@ export default function App() {
     };
   }, [user, showToast]);
 
+  // 3B. Real-time Online/Offline Presence, Device & Login Area Tracking
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) return;
+
+    updateUserPresence(uid, { isOnline: true, includeMeta: true });
+
+    const heartbeatTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        updateUserPresence(uid, { isOnline: true });
+      }
+    }, 60 * 1000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        updateUserPresence(uid, { isOnline: true });
+      } else {
+        updateUserPresence(uid, { isOnline: false });
+      }
+    };
+
+    const handleFocus = () => {
+      updateUserPresence(uid, { isOnline: true });
+    };
+
+    const handlePageHide = () => {
+      updateUserPresence(uid, { isOnline: false });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handlePageHide);
+
+    return () => {
+      window.clearInterval(heartbeatTimer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handlePageHide);
+    };
+  }, [user?.uid]);
+
   // Safety net: if user finishes signing in while on /login, redirect straight to their destination
   useEffect(() => {
     if (route.page !== 'login' || !authReady || !user) return;
@@ -757,7 +837,9 @@ export default function App() {
       ? { page: 'checkout', planId: pendingCheckoutPlanId }
       : authReturnRoute && authReturnRoute.page !== 'login'
         ? authReturnRoute
-        : isSuperAdminEmail(user.email)
+        : isSuperAdminEmail(user.email) ||
+            isBootstrappedModeratorEmail(user.email) ||
+            user.role === 'moderator'
           ? { page: 'admin' }
           : { page: 'profile' };
     navigate(target);
@@ -779,6 +861,9 @@ export default function App() {
   const premiumQuotaLimit = isAdminUser ? undefined : getUserPremiumQuota(user, plans, recipes);
 
   const handleLogout = async () => {
+    if (user?.uid) {
+      await updateUserPresence(user.uid, { isOnline: false });
+    }
     await signOut(auth);
     navigate({ page: 'home' });
     showToast('সফলভাবে লগআউট সম্পন্ন হয়েছে।');
@@ -795,9 +880,19 @@ export default function App() {
     setInterestVersion((v) => v + 1);
   };
 
+  const handleOpenProfileMessages = () => {
+    setProfileNotifTab('messages');
+    setProfileNotifTabNonce((n) => n + 1);
+    navigate({ page: 'profile' });
+  };
+
   const handleNotificationClick = async (notif: UserNotification) => {
     if (user && !notif.isRead) {
       markNotificationRead(user.uid, notif.id).catch(() => {});
+    }
+    if (notif.type === 'admin_message') {
+      handleOpenProfileMessages();
+      return;
     }
     if (notif.recipeId) {
       navigate({ page: 'recipe-detail', id: notif.recipeId });
@@ -809,6 +904,7 @@ export default function App() {
     ) {
       navigate({ page: 'pricing' });
     } else {
+      setProfileNotifTab('notifications');
       navigate({ page: 'profile' });
     }
   };
@@ -825,6 +921,31 @@ export default function App() {
   const favoriteRecipesList = user
     ? recipes.filter((r) => user.favoriteRecipeIds.includes(r.id))
     : [];
+
+  const homeTypoClass = getResponsiveTypographyClass(
+    siteSettings.homeFontFamily,
+    siteSettings.homeFontMobile,
+    siteSettings.homeFontSize,
+    siteSettings.homeFontSizeMobile
+  );
+  const pricingTypoClass = getResponsiveTypographyClass(
+    siteSettings.pricingFontFamily,
+    siteSettings.pricingFontMobile,
+    siteSettings.pricingFontSize,
+    siteSettings.pricingFontSizeMobile
+  );
+  const blogTipsTypoClass = getResponsiveTypographyClass(
+    siteSettings.blogTipsFontFamily,
+    siteSettings.blogTipsFontMobile,
+    siteSettings.blogTipsFontSize,
+    siteSettings.blogTipsFontSizeMobile
+  );
+  const authTypoClass = getResponsiveTypographyClass(
+    siteSettings.authFontFamily,
+    siteSettings.authFontMobile,
+    siteSettings.authFontSize,
+    siteSettings.authFontSizeMobile
+  );
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-[#1A1A1A] pb-28 md:pb-0">
@@ -853,8 +974,11 @@ export default function App() {
         announcementText={siteSettings.announcementText}
         showAnnouncement={siteSettings.showAnnouncement}
         notifications={notifications}
+        unreadDirectMessagesCount={unreadDirectMessagesCount}
+        adminContactEmail={siteSettings.contactEmail}
         onNotificationClick={handleNotificationClick}
         onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+        onOpenProfileMessages={handleOpenProfileMessages}
         categories={categories}
         recipes={recipes}
         selectedCategory={route.page === 'category' ? route.categoryName : selectedFilter}
@@ -888,68 +1012,72 @@ export default function App() {
         {/* PAGE 1: HOME PAGE */}
         {route.page === 'home' && (
           <>
-            {/* Mobile Category Strip directly below Top Bar */}
-            <div className="md:hidden bg-[#FCFCFA] border-b border-gray-100">
-              <CategoryStrip
-                compact
-                categories={categories}
-                selectedCategory={selectedFilter}
-                onSelectCategory={navigateToCategory}
-              />
-            </div>
+            <div className={homeTypoClass}>
+              {/* Mobile Category Strip directly below Top Bar */}
+              <div className="md:hidden bg-[#FCFCFA] border-b border-gray-100">
+                <CategoryStrip
+                  compact
+                  categories={categories}
+                  selectedCategory={selectedFilter}
+                  onSelectCategory={navigateToCategory}
+                />
+              </div>
 
-            <HeroCarousel
-              recipes={recipes}
-              onSelectRecipe={(r) => navigate({ page: 'recipe-detail', id: r.id })}
-            />
-
-            {/* Mobile Primary Recipe Feed (10 newest recipes + 'সকল রেসিপি পেজে যান' button) */}
-            <div className="md:hidden pb-5">
-              <RecipeFeed
+              <HeroCarousel
                 recipes={recipes}
-                selectedFilter={selectedFilter}
-                onFilterChange={setSelectedFilter}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
                 onSelectRecipe={(r) => navigate({ page: 'recipe-detail', id: r.id })}
-                favoriteIds={user?.favoriteRecipeIds || []}
-                onToggleFavorite={handleToggleFavorite}
-                hasActiveSubscription={hasActivePremiumAccess}
-                unlockedIds={effectiveUnlockedIds}
-                quotaLimit={effectiveQuotaLimit}
-                freeUnlockedIds={freeUnlockedIds}
-                premiumUnlockedIds={premiumUnlockedIds}
-                premiumQuotaLimit={premiumQuotaLimit}
-                freeQuotaLimit={FREE_RECIPE_LIMIT}
-                pageSize={10}
-                currentPage={1}
-                hidePagination
               />
-              <div className="px-4 mt-1 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRecipesPage(1);
-                    navigate({ page: 'recipes' });
-                  }}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#1B4D24] hover:bg-[#143A1B] text-white text-sm font-bold shadow-sm transition-colors cursor-pointer"
-                >
-                  সকল রেসিপি পেজে যান
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+
+              {/* Mobile Primary Recipe Feed (10 newest recipes + 'সকল রেসিপি পেজে যান' button) */}
+              <div className="md:hidden pb-5">
+                <RecipeFeed
+                  recipes={recipes}
+                  selectedFilter={selectedFilter}
+                  onFilterChange={setSelectedFilter}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  onSelectRecipe={(r) => navigate({ page: 'recipe-detail', id: r.id })}
+                  favoriteIds={user?.favoriteRecipeIds || []}
+                  onToggleFavorite={handleToggleFavorite}
+                  hasActiveSubscription={hasActivePremiumAccess}
+                  unlockedIds={effectiveUnlockedIds}
+                  quotaLimit={effectiveQuotaLimit}
+                  freeUnlockedIds={freeUnlockedIds}
+                  premiumUnlockedIds={premiumUnlockedIds}
+                  premiumQuotaLimit={premiumQuotaLimit}
+                  freeQuotaLimit={FREE_RECIPE_LIMIT}
+                  pageSize={10}
+                  currentPage={1}
+                  hidePagination
+                />
+                <div className="px-4 mt-1 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecipesPage(1);
+                      navigate({ page: 'recipes' });
+                    }}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#1B4D24] hover:bg-[#143A1B] text-white text-sm font-bold shadow-sm transition-colors cursor-pointer"
+                  >
+                    সকল রেসিপি পেজে যান
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* 3-Column Subscription Plans on subtle spice line-art background */}
-            <PricingSection
-              plans={plans}
-              currentTier={user?.subscriptionPlan}
-              onSelectPlan={handleSelectPlan}
-              showHeading
-            />
+            <div className={pricingTypoClass}>
+              <PricingSection
+                plans={plans}
+                currentTier={user?.subscriptionPlan}
+                onSelectPlan={handleSelectPlan}
+                showHeading
+              />
+            </div>
 
             {/* Desktop Newest Recipes Feed (9 newest recipes + Minimal Category Strip + 'সকল রেসিপি পেজে যান' button) */}
-            <div className="hidden md:block pb-10">
+            <div className={`hidden md:block pb-10 ${homeTypoClass}`}>
               <RecipeFeed
                 recipes={recipes}
                 selectedFilter="সব"
@@ -1003,57 +1131,61 @@ export default function App() {
 
         {/* PAGE 2: ALL RECIPES PAGE */}
         {route.page === 'recipes' && (
-          <RecipeFeed
-            recipes={recipes}
-            categories={categories}
-            selectedFilter={selectedFilter}
-            onFilterChange={setSelectedFilter}
-            onSelectCategory={navigateToCategory}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onSelectRecipe={(r) => navigate({ page: 'recipe-detail', id: r.id })}
-            favoriteIds={user?.favoriteRecipeIds || []}
-            onToggleFavorite={handleToggleFavorite}
-            hasActiveSubscription={hasActivePremiumAccess}
-            unlockedIds={effectiveUnlockedIds}
-            quotaLimit={effectiveQuotaLimit}
-            freeUnlockedIds={freeUnlockedIds}
-            premiumUnlockedIds={premiumUnlockedIds}
-            premiumQuotaLimit={premiumQuotaLimit}
-            freeQuotaLimit={FREE_RECIPE_LIMIT}
-            title="সকল রেসিপি সংগ্রহ"
-            hideSearchAndFilters
-            centerHeading
-            pageSize={10}
-            desktopPageSize={9}
-            currentPage={recipesPage}
-            onPageChange={setRecipesPage}
-          />
+          <div className={homeTypoClass}>
+            <RecipeFeed
+              recipes={recipes}
+              categories={categories}
+              selectedFilter={selectedFilter}
+              onFilterChange={setSelectedFilter}
+              onSelectCategory={navigateToCategory}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onSelectRecipe={(r) => navigate({ page: 'recipe-detail', id: r.id })}
+              favoriteIds={user?.favoriteRecipeIds || []}
+              onToggleFavorite={handleToggleFavorite}
+              hasActiveSubscription={hasActivePremiumAccess}
+              unlockedIds={effectiveUnlockedIds}
+              quotaLimit={effectiveQuotaLimit}
+              freeUnlockedIds={freeUnlockedIds}
+              premiumUnlockedIds={premiumUnlockedIds}
+              premiumQuotaLimit={premiumQuotaLimit}
+              freeQuotaLimit={FREE_RECIPE_LIMIT}
+              title="সকল রেসিপি সংগ্রহ"
+              hideSearchAndFilters
+              centerHeading
+              pageSize={10}
+              desktopPageSize={9}
+              currentPage={recipesPage}
+              onPageChange={setRecipesPage}
+            />
+          </div>
         )}
 
         {/* PAGE 2B: DEDICATED DYNAMIC CATEGORY PAGE */}
         {route.page === 'category' && (
-          <CategoryPage
-            categorySlug={route.categoryName}
-            categories={categories}
-            recipes={recipes}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onSelectRecipe={(r) => navigate({ page: 'recipe-detail', id: r.id })}
-            onSelectCategory={navigateToCategory}
-            onNavigate={navigate}
-            favoriteIds={user?.favoriteRecipeIds || []}
-            onToggleFavorite={handleToggleFavorite}
-            hasActiveSubscription={hasActivePremiumAccess}
-            unlockedIds={effectiveUnlockedIds}
-            quotaLimit={effectiveQuotaLimit}
-            freeUnlockedIds={freeUnlockedIds}
-            premiumUnlockedIds={premiumUnlockedIds}
-            premiumQuotaLimit={premiumQuotaLimit}
-            freeQuotaLimit={FREE_RECIPE_LIMIT}
-            currentPage={categoryPageNum}
-            onPageChange={setCategoryPageNum}
-          />
+          <div className={homeTypoClass}>
+            <CategoryPage
+              categorySlug={route.categoryName}
+              categories={categories}
+              recipes={recipes}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onSelectRecipe={(r) => navigate({ page: 'recipe-detail', id: r.id })}
+              onSelectCategory={navigateToCategory}
+              onNavigate={navigate}
+              favoriteIds={user?.favoriteRecipeIds || []}
+              onToggleFavorite={handleToggleFavorite}
+              hasActiveSubscription={hasActivePremiumAccess}
+              unlockedIds={effectiveUnlockedIds}
+              quotaLimit={effectiveQuotaLimit}
+              freeUnlockedIds={freeUnlockedIds}
+              premiumUnlockedIds={premiumUnlockedIds}
+              premiumQuotaLimit={premiumQuotaLimit}
+              freeQuotaLimit={FREE_RECIPE_LIMIT}
+              currentPage={categoryPageNum}
+              onPageChange={setCategoryPageNum}
+            />
+          </div>
         )}
 
         {/* PAGE 3: INDIVIDUAL RECIPE DETAIL PAGE */}
@@ -1115,12 +1247,14 @@ export default function App() {
 
         {/* PAGE 4: PRICING / MEMBERSHIP PAGE */}
         {route.page === 'pricing' && (
-          <PricingSection
-            plans={plans}
-            currentTier={user?.subscriptionPlan}
-            onSelectPlan={handleSelectPlan}
-            showHeading
-          />
+          <div className={pricingTypoClass}>
+            <PricingSection
+              plans={plans}
+              currentTier={user?.subscriptionPlan}
+              onSelectPlan={handleSelectPlan}
+              showHeading
+            />
+          </div>
         )}
 
         {/* PAGE 5: MANUAL TXID CHECKOUT PAGE */}
@@ -1144,25 +1278,37 @@ export default function App() {
         )}
 
         {/* PAGE 6: TIPS PAGE */}
-        {route.page === 'tips' && <TipsSection tips={tips} onNavigate={navigate} />}
+        {route.page === 'tips' && (
+          <div className={blogTipsTypoClass}>
+            <TipsSection tips={tips} onNavigate={navigate} />
+          </div>
+        )}
 
         {/* PAGE 7: INDIVIDUAL TIP PAGE */}
         {route.page === 'tip-detail' && (
-          <TipDetailPage
-            tip={tips.find((t) => t.id === route.id)}
-            onNavigate={navigate}
-          />
+          <div className={blogTipsTypoClass}>
+            <TipDetailPage
+              tip={tips.find((t) => t.id === route.id)}
+              onNavigate={navigate}
+            />
+          </div>
         )}
 
         {/* PAGE 8: BLOG PAGE */}
-        {route.page === 'blog' && <BlogSection posts={blogPosts} onNavigate={navigate} />}
+        {route.page === 'blog' && (
+          <div className={blogTipsTypoClass}>
+            <BlogSection posts={blogPosts} onNavigate={navigate} />
+          </div>
+        )}
 
         {/* PAGE 9: INDIVIDUAL BLOG ARTICLE PAGE */}
         {route.page === 'blog-detail' && (
-          <BlogDetailPage
-            post={blogPosts.find((p) => p.id === route.id)}
-            onNavigate={navigate}
-          />
+          <div className={blogTipsTypoClass}>
+            <BlogDetailPage
+              post={blogPosts.find((p) => p.id === route.id)}
+              onNavigate={navigate}
+            />
+          </div>
         )}
 
         {/* PAGE 10: CONTACT PAGE */}
@@ -1170,7 +1316,7 @@ export default function App() {
 
         {/* PAGE 11: FAVORITES PAGE */}
         {route.page === 'favorites' && (
-          <section className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+          <section className={`${homeTypoClass} max-w-6xl mx-auto px-4 sm:px-6 py-8`}>
             <h1 className="font-display-bn text-2xl sm:text-3xl font-bold text-[#1A1A1A] mb-2">
               আপনার প্রিয় রেসিপি
             </h1>
@@ -1212,17 +1358,19 @@ export default function App() {
 
         {/* PAGE 12: LOGIN / SIGN UP PAGE */}
         {route.page === 'login' && (
-          <AuthPage
-            siteName={siteSettings.siteName}
-            onNavigate={navigate}
-            onProfileSynced={(profile) => setUser(profile)}
-            pendingPlan={
-              pendingCheckoutPlanId
-                ? plans.find((p) => p.id === pendingCheckoutPlanId) || null
-                : null
-            }
-            returnRoute={authReturnRoute}
-          />
+          <div className={authTypoClass}>
+            <AuthPage
+              siteName={siteSettings.siteName}
+              onNavigate={navigate}
+              onProfileSynced={(profile) => setUser(profile)}
+              pendingPlan={
+                pendingCheckoutPlanId
+                  ? plans.find((p) => p.id === pendingCheckoutPlanId) || null
+                  : null
+              }
+              returnRoute={authReturnRoute}
+            />
+          </div>
         )}
 
         {/* PAGE 13: PROFILE PAGE */}
@@ -1238,6 +1386,9 @@ export default function App() {
               plans={plans}
               siteSettings={siteSettings}
               notifications={notifications}
+              unreadDirectMessagesCount={unreadDirectMessagesCount}
+              initialNotifTab={profileNotifTab}
+              initialNotifTabNonce={profileNotifTabNonce}
               onNotificationClick={handleNotificationClick}
               onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
               onLogout={handleLogout}
@@ -1284,12 +1435,14 @@ export default function App() {
               <div className="w-8 h-8 rounded-full border-2 border-[#1B4D24]/20 border-t-[#1B4D24] animate-spin" />
             </div>
           ) : !user ? (
-            <AuthPage
-              siteName={siteSettings.siteName}
-              onNavigate={navigate}
-              onProfileSynced={(profile) => setUser(profile)}
-              returnRoute={{ page: 'admin' }}
-            />
+            <div className={authTypoClass}>
+              <AuthPage
+                siteName={siteSettings.siteName}
+                onNavigate={navigate}
+                onProfileSynced={(profile) => setUser(profile)}
+                returnRoute={{ page: 'admin' }}
+              />
+            </div>
           ) : (
             <AdminPanel
               currentUser={user}
@@ -1299,6 +1452,7 @@ export default function App() {
               tips={tips}
               blogPosts={blogPosts}
               siteSettings={siteSettings}
+              onSiteSettingsSaved={(updated) => setSiteSettings(updated)}
               onNavigate={navigate}
             />
           )

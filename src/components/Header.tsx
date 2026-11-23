@@ -12,6 +12,7 @@ import {
   LogOut,
   Mail,
   Menu,
+  MessageCircle,
   MessageSquare,
   Search,
   ShieldCheck,
@@ -22,6 +23,7 @@ import {
 import { Timestamp } from 'firebase/firestore';
 import { BrandMark } from './BrandMark';
 import { CategoryIcon } from './CategoryIcon';
+import { UserAdminChatPanel } from './UserAdminChatPanel';
 import {
   FREE_RECIPE_LIMIT,
   getUserFreeUnlockedIds,
@@ -43,8 +45,11 @@ interface HeaderProps {
   announcementText?: string;
   showAnnouncement?: boolean;
   notifications?: UserNotification[];
+  unreadDirectMessagesCount?: number;
+  adminContactEmail?: string;
   onNotificationClick?: (notif: UserNotification) => void;
   onMarkAllNotificationsRead?: () => void;
+  onOpenProfileMessages?: () => void;
   categories?: RecipeCategory[];
   recipes?: Recipe[];
   selectedCategory?: string;
@@ -112,8 +117,11 @@ export const Header: React.FC<HeaderProps> = ({
   announcementText,
   showAnnouncement,
   notifications = [],
+  unreadDirectMessagesCount = 0,
+  adminContactEmail,
   onNotificationClick,
   onMarkAllNotificationsRead,
+  onOpenProfileMessages,
   categories = [],
   recipes = [],
   selectedCategory = 'সব',
@@ -164,10 +172,12 @@ export const Header: React.FC<HeaderProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [notifPanelTab, setNotifPanelTab] = useState<'notifications' | 'messages'>('notifications');
   const notifContainerRef = useRef<HTMLDivElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const totalBellUnreadCount = unreadCount + unreadDirectMessagesCount;
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -287,7 +297,7 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </form>
 
-            {user?.role === 'admin' && (
+            {(user?.role === 'admin' || user?.role === 'moderator') && (
               <button
                 type="button"
                 onClick={() => onNavigate('admin')}
@@ -298,7 +308,7 @@ export const Header: React.FC<HeaderProps> = ({
                 }`}
               >
                 <ShieldCheck className="w-4 h-4" />
-                এডমিন প্যানেল
+                {user.role === 'admin' ? 'এডমিন প্যানেল' : 'মোডারেটর প্যানেল'}
               </button>
             )}
 
@@ -314,9 +324,9 @@ export const Header: React.FC<HeaderProps> = ({
                 }`}
               >
                 <Bell className="w-4 h-4" />
-                {unreadCount > 0 && (
+                {totalBellUnreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#B92B27] text-white text-[10px] font-bold flex items-center justify-center tabular-nums">
-                    {unreadCount > 9 ? '৯+' : toBengaliDigits(unreadCount)}
+                    {totalBellUnreadCount > 9 ? '৯+' : toBengaliDigits(totalBellUnreadCount)}
                   </span>
                 )}
               </button>
@@ -413,9 +423,9 @@ export const Header: React.FC<HeaderProps> = ({
                 }`}
               >
                 <Bell className="w-5 h-5" />
-                {unreadCount > 0 && (
+                {totalBellUnreadCount > 0 && (
                   <span className="absolute top-1.5 right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-[#B92B27] text-white text-[9px] font-bold flex items-center justify-center tabular-nums">
-                    {unreadCount > 9 ? '৯+' : toBengaliDigits(unreadCount)}
+                    {totalBellUnreadCount > 9 ? '৯+' : toBengaliDigits(totalBellUnreadCount)}
                   </span>
                 )}
               </button>
@@ -454,111 +464,195 @@ export const Header: React.FC<HeaderProps> = ({
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               className="fixed md:absolute top-13 md:top-[74px] right-2 sm:right-6 left-2 sm:left-auto sm:w-96 z-50 bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden origin-top-right"
             >
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2 bg-[#FAFAF8]">
-              <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-[#1B4D24]" />
-                <span className="text-sm font-bold text-[#1A1A1A]">
-                  নোটিফিকেশন ({toBengaliDigits(unreadCount)} নতুন)
-                </span>
+            <div className="px-3.5 pt-3 pb-2.5 border-b border-gray-100 bg-[#FAFAF8] space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-gray-200 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setNotifPanelTab('notifications')}
+                    className={`flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                      notifPanelTab === 'notifications'
+                        ? 'bg-[#1B4D24] text-white shadow-2xs'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Bell className="w-3.5 h-3.5 shrink-0" />
+                    <span>নোটিফিকেশন</span>
+                    {unreadCount > 0 && (
+                      <span
+                        className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold tabular-nums ${
+                          notifPanelTab === 'notifications'
+                            ? 'bg-white/20 text-white'
+                            : 'bg-[#B92B27] text-white'
+                        }`}
+                      >
+                        {toBengaliDigits(unreadCount)}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNotifPanelTab('messages')}
+                    className={`flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                      notifPanelTab === 'messages'
+                        ? 'bg-[#1B4D24] text-white shadow-2xs'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>মেসেজ</span>
+                    {unreadDirectMessagesCount > 0 && (
+                      <span
+                        className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold tabular-nums ${
+                          notifPanelTab === 'messages'
+                            ? 'bg-white/20 text-white'
+                            : 'bg-[#B92B27] text-white'
+                        }`}
+                      >
+                        {toBengaliDigits(unreadDirectMessagesCount)}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setNotifOpen(false)}
+                  aria-label="বন্ধ করুন"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg cursor-pointer shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <div className="flex items-center gap-2">
-                {unreadCount > 0 && onMarkAllNotificationsRead && (
+
+              {notifPanelTab === 'notifications' && unreadCount > 0 && onMarkAllNotificationsRead && (
+                <div className="flex items-center justify-end">
                   <button
                     type="button"
                     onClick={onMarkAllNotificationsRead}
                     className="inline-flex items-center gap-1 text-[11px] font-bold text-[#1B4D24] hover:underline cursor-pointer"
                   >
                     <CheckCheck className="w-3.5 h-3.5" />
-                    সব পড়া হয়েছে
+                    সব পড়া হয়েছে চিহ্নিত করুন
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setNotifOpen(false)}
-                  aria-label="বন্ধ করুন"
-                  className="p-1 text-gray-400 hover:text-gray-700 rounded-lg cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
-              {notifications.length === 0 ? (
-                <div className="p-6 text-center text-xs text-gray-500">
-                  এখনো কোনো নোটিফিকেশন নেই। আপনার মন্তব্যের রিপ্লাই বা পেমেন্টের আপডেট এখানে দেখা যাবে।
                 </div>
-              ) : (
-                notifications.slice(0, 10).map((n) => (
-                  <button
-                    key={n.id}
-                    type="button"
-                    onClick={() => {
-                      setNotifOpen(false);
-                      onNotificationClick?.(n);
-                    }}
-                    className={`w-full text-left p-3.5 flex items-start gap-3 transition-colors cursor-pointer hover:bg-gray-50 ${
-                      n.isRead ? 'bg-white' : 'bg-[#F3F8F4]'
-                    }`}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                        n.type === 'comment_reply'
-                          ? 'bg-[#1B4D24]/12 text-[#1B4D24]'
-                          : n.type === 'payment_approved'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : n.type === 'payment_rejected' || n.type === 'free_limit_reached'
-                              ? 'bg-red-100 text-red-600'
-                              : n.type === 'pro_limit_reached'
-                                ? 'bg-amber-100 text-[#9A6E04]'
-                                : n.type === 'plan_expiry_reminder'
-                                  ? 'bg-orange-100 text-orange-700'
-                                  : 'bg-amber-100 text-amber-700'
-                      }`}
-                    >
-                      {n.type === 'comment_reply' ? (
-                        <MessageSquare className="w-4 h-4" />
-                      ) : n.type === 'payment_approved' ? (
-                        <CheckCircle2 className="w-4 h-4" />
-                      ) : n.type === 'payment_rejected' ? (
-                        <XCircle className="w-4 h-4" />
-                      ) : n.type === 'free_limit_reached' || n.type === 'plan_expiry_reminder' ? (
-                        <AlertTriangle className="w-4 h-4" />
-                      ) : n.type === 'pro_limit_reached' ? (
-                        <Crown className="w-4 h-4" />
-                      ) : (
-                        <Clock className="w-4 h-4" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-bold text-[#1A1A1A] truncate">{n.title}</p>
-                        {!n.isRead && (
-                          <span className="text-[10px] font-bold text-[#B92B27] shrink-0">নতুন</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-600 mt-0.5 line-clamp-2 leading-relaxed">
-                        {n.message}
-                      </p>
-                      <p className="text-[10px] text-gray-400 mt-1">{formatNotifTime(n.createdAt)}</p>
-                    </div>
-                  </button>
-                ))
               )}
             </div>
 
-            <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setNotifOpen(false);
-                  onNavigate('profile');
-                }}
-                className="text-xs font-bold text-[#1B4D24] hover:underline cursor-pointer"
-              >
-                প্রোফাইলে সকল নোটিফিকেশন দেখুন →
-              </button>
-            </div>
+            {notifPanelTab === 'messages' ? (
+              <>
+                <UserAdminChatPanel
+                  user={user}
+                  siteName={siteName}
+                  adminContactEmail={adminContactEmail}
+                  compact
+                />
+                <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotifOpen(false);
+                      if (onOpenProfileMessages) {
+                        onOpenProfileMessages();
+                      } else {
+                        onNavigate('profile');
+                      }
+                    }}
+                    className="text-xs font-bold text-[#1B4D24] hover:underline cursor-pointer"
+                  >
+                    প্রোফাইলে বড় স্ক্রিনে মেসেজ দেখুন →
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                  {notifications.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-gray-500">
+                      এখনো কোনো নোটিফিকেশন নেই। আপনার মন্তব্যের রিপ্লাই, পেমেন্ট আপডেট বা এডমিনের বার্তা এখানে দেখা যাবে।
+                    </div>
+                  ) : (
+                    notifications.slice(0, 10).map((n) => (
+                      <button
+                        key={n.id}
+                        type="button"
+                        onClick={() => {
+                          if (n.type === 'admin_message') {
+                            onNotificationClick?.(n);
+                            setNotifPanelTab('messages');
+                            return;
+                          }
+                          setNotifOpen(false);
+                          onNotificationClick?.(n);
+                        }}
+                        className={`w-full text-left p-3.5 flex items-start gap-3 transition-colors cursor-pointer hover:bg-gray-50 ${
+                          n.isRead ? 'bg-white' : 'bg-[#F3F8F4]'
+                        }`}
+                      >
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                            n.type === 'admin_message'
+                              ? 'bg-[#1B4D24] text-white'
+                              : n.type === 'comment_reply'
+                                ? 'bg-[#1B4D24]/12 text-[#1B4D24]'
+                                : n.type === 'payment_approved'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : n.type === 'payment_rejected' || n.type === 'free_limit_reached'
+                                    ? 'bg-red-100 text-red-600'
+                                    : n.type === 'pro_limit_reached'
+                                      ? 'bg-amber-100 text-[#9A6E04]'
+                                      : n.type === 'plan_expiry_reminder'
+                                        ? 'bg-orange-100 text-orange-700'
+                                        : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {n.type === 'admin_message' ? (
+                            <MessageCircle className="w-4 h-4" />
+                          ) : n.type === 'comment_reply' ? (
+                            <MessageSquare className="w-4 h-4" />
+                          ) : n.type === 'payment_approved' ? (
+                            <CheckCircle2 className="w-4 h-4" />
+                          ) : n.type === 'payment_rejected' ? (
+                            <XCircle className="w-4 h-4" />
+                          ) : n.type === 'free_limit_reached' || n.type === 'plan_expiry_reminder' ? (
+                            <AlertTriangle className="w-4 h-4" />
+                          ) : n.type === 'pro_limit_reached' ? (
+                            <Crown className="w-4 h-4" />
+                          ) : (
+                            <Clock className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-bold text-[#1A1A1A] truncate">{n.title}</p>
+                            {!n.isRead && (
+                              <span className="text-[10px] font-bold text-[#B92B27] shrink-0">নতুন</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-600 mt-0.5 line-clamp-2 leading-relaxed">
+                            {n.message}
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-1">{formatNotifTime(n.createdAt)}</p>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotifOpen(false);
+                      onNavigate('profile');
+                    }}
+                    className="text-xs font-bold text-[#1B4D24] hover:underline cursor-pointer"
+                  >
+                    প্রোফাইলে সকল নোটিফিকেশন দেখুন →
+                  </button>
+                </div>
+              </>
+            )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -688,7 +782,7 @@ export const Header: React.FC<HeaderProps> = ({
                     );
                   })}
 
-                  {user?.role === 'admin' && (
+                  {(user?.role === 'admin' || user?.role === 'moderator') && (
                     <button
                       type="button"
                       onClick={() => handleMobileNav('admin')}
@@ -708,7 +802,9 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           <ShieldCheck className="w-[17px] h-[17px]" strokeWidth={1.75} />
                         </span>
-                        <span className="text-[14.5px] font-semibold">এডমিন প্যানেল</span>
+                        <span className="text-[14.5px] font-semibold">
+                          {user.role === 'admin' ? 'এডমিন প্যানেল' : 'মোডারেটর প্যানেল'}
+                        </span>
                       </div>
                       <ChevronRight className="w-4 h-4 shrink-0 opacity-70" />
                     </button>

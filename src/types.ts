@@ -2,7 +2,7 @@ export type DietType = 'ভেজ' | 'নন-ভেজ';
 export type DifficultyLevel = 'সহজ' | 'মাঝারি' | 'কঠিন';
 export type PlanTier = 'basic' | 'standard' | 'pro';
 export type PlanAccent = 'green' | 'gold' | 'red';
-export type UserRole = 'member' | 'admin';
+export type UserRole = 'member' | 'moderator' | 'admin';
 export type SubscriptionStatus = 'active' | 'expired';
 
 export type PageRoute =
@@ -52,6 +52,8 @@ export interface Recipe {
   isPremium: boolean;
   isFeatured: boolean;
   orderIndex: number;
+  createdByUid?: string;
+  createdByName?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
 }
@@ -99,7 +101,8 @@ export type NotificationType =
   | 'payment_pending'
   | 'free_limit_reached'
   | 'pro_limit_reached'
-  | 'plan_expiry_reminder';
+  | 'plan_expiry_reminder'
+  | 'admin_message';
 
 export interface UserNotification {
   id: string;
@@ -150,7 +153,32 @@ export interface UserProfile {
   premiumUnlockedRecipeIds?: string[];
   premiumRecipeQuota?: number;
   viewedHistory?: RecipeHistoryEntry[];
+  isOnline?: boolean;
+  lastActiveAt?: unknown;
+  lastLoginDevice?: string;
+  lastLoginLocation?: string;
   createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+export interface DirectMessage {
+  id: string;
+  senderUid: string;
+  senderName: string;
+  senderRole: 'admin' | 'user';
+  text: string;
+  createdAt?: unknown;
+}
+
+export interface DirectMessageThread {
+  userId: string;
+  userName: string;
+  userContact?: string;
+  userPhotoURL?: string;
+  lastMessage: string;
+  lastSenderRole: 'admin' | 'user';
+  unreadByAdmin: number;
+  unreadByUser: number;
   updatedAt?: unknown;
 }
 
@@ -180,6 +208,8 @@ export interface CookingTip {
   content: string;
   readTime: string;
   isPublished: boolean;
+  createdByUid?: string;
+  createdByName?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
 }
@@ -194,20 +224,45 @@ export interface BlogPost {
   category: string;
   readTime: string;
   isPublished: boolean;
+  createdByUid?: string;
+  createdByName?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
+}
+
+export type RecycleBinItemType = 'recipe' | 'tip' | 'blog';
+
+export interface RecycleBinItem {
+  id: string;
+  itemType: RecycleBinItemType;
+  originalId: string;
+  title: string;
+  subtitle?: string;
+  category?: string;
+  payloadJson: string;
+  deletedByUid: string;
+  deletedByName: string;
+  deletedAt?: unknown;
+  expiresAt?: unknown;
 }
 
 export type RecipeFontKey =
   | 'bensen'
   | 'atma'
+  | 'alkatra'
+  | 'galada'
   | 'tiro-italic'
   | 'noto-serif'
   | 'tiro'
   | 'hind-siliguri'
+  | 'anek-bangla'
+  | 'baloo-da-2'
+  | 'mina'
   | 'noto-sans';
 
-export type FontSizeKey = 'sm' | 'md' | 'lg' | 'xl';
+export type NormalizedFontSizeKey = '100' | '105' | '110' | '115' | '120';
+
+export type FontSizeKey = NormalizedFontSizeKey | 'sm' | 'md' | 'lg' | 'xl';
 
 export interface SiteSettings {
   siteName: string;
@@ -222,9 +277,33 @@ export interface SiteSettings {
   recipeFontSizeDesktop?: FontSizeKey;
   recipeFontSizeMobile?: FontSizeKey;
   adminFontFamily?: RecipeFontKey;
+  adminFontMobile?: RecipeFontKey;
   adminFontSize?: FontSizeKey;
+  adminFontSizeMobile?: FontSizeKey;
   profileFontFamily?: RecipeFontKey;
+  profileFontMobile?: RecipeFontKey;
   profileFontSize?: FontSizeKey;
+  profileFontSizeMobile?: FontSizeKey;
+  checkoutFontFamily?: RecipeFontKey;
+  checkoutFontMobile?: RecipeFontKey;
+  checkoutFontSize?: FontSizeKey;
+  checkoutFontSizeMobile?: FontSizeKey;
+  homeFontFamily?: RecipeFontKey;
+  homeFontMobile?: RecipeFontKey;
+  homeFontSize?: FontSizeKey;
+  homeFontSizeMobile?: FontSizeKey;
+  pricingFontFamily?: RecipeFontKey;
+  pricingFontMobile?: RecipeFontKey;
+  pricingFontSize?: FontSizeKey;
+  pricingFontSizeMobile?: FontSizeKey;
+  blogTipsFontFamily?: RecipeFontKey;
+  blogTipsFontMobile?: RecipeFontKey;
+  blogTipsFontSize?: FontSizeKey;
+  blogTipsFontSizeMobile?: FontSizeKey;
+  authFontFamily?: RecipeFontKey;
+  authFontMobile?: RecipeFontKey;
+  authFontSize?: FontSizeKey;
+  authFontSizeMobile?: FontSizeKey;
   seoTitle?: string;
   seoDescription?: string;
   seoKeywords?: string;

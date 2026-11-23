@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, CheckCircle2, Clock, Phone, ShieldCheck } from 'lucide-react';
 import { submitSubscriptionOrder } from '../services/firestoreService';
+import { getResponsiveTypographyClass } from '../utils/typography';
 import type { PageRoute, SiteSettings, SubscriptionPlan, UserProfile } from '../types';
 
 interface CheckoutPageProps {
@@ -27,9 +28,16 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [submittedStatus, setSubmittedStatus] = useState<'active' | 'pending' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const checkoutTypoClass = getResponsiveTypographyClass(
+    siteSettings.checkoutFontFamily,
+    siteSettings.checkoutFontMobile,
+    siteSettings.checkoutFontSize,
+    siteSettings.checkoutFontSizeMobile
+  );
+
   if (!plan) {
     return (
-      <section className="max-w-lg mx-auto px-4 py-14 text-center space-y-4">
+      <section className={`${checkoutTypoClass} max-w-lg mx-auto px-4 py-14 text-center space-y-4`}>
         <h1 className="font-display-bn text-2xl font-bold">প্ল্যান পাওয়া যায়নি</h1>
         <button
           type="button"
@@ -100,7 +108,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const cleanTxDisplay = txId.trim();
 
   return (
-    <section className="max-w-2xl mx-auto px-4 sm:px-6 py-8 md:py-12">
+    <section className={`${checkoutTypoClass} max-w-2xl mx-auto px-4 sm:px-6 py-8 md:py-12`}>
       <button
         type="button"
         onClick={() => onNavigate({ page: 'pricing' })}

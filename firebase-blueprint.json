@@ -20,6 +20,8 @@
         "isPremium": { "type": "boolean" },
         "isFeatured": { "type": "boolean" },
         "orderIndex": { "type": "integer" },
+        "createdByUid": { "type": "string", "maxLength": 128 },
+        "createdByName": { "type": "string", "maxLength": 100 },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -130,7 +132,7 @@
         "photoURL": { "type": "string", "maxLength": 160000 },
         "address": { "type": "string", "maxLength": 240 },
         "age": { "type": "integer" },
-        "role": { "type": "string", "enum": ["member", "admin"] },
+        "role": { "type": "string", "enum": ["member", "moderator", "admin"] },
         "subscriptionPlan": { "type": "string", "enum": ["basic", "standard", "pro"] },
         "subscriptionStatus": { "type": "string", "enum": ["active", "expired"] },
         "subscriptionExpiresAt": { "type": "string", "format": "date-time" },
@@ -141,6 +143,10 @@
         "premiumUnlockedRecipeIds": { "type": "array" },
         "premiumRecipeQuota": { "type": "integer" },
         "viewedHistory": { "type": "array" },
+        "isOnline": { "type": "boolean" },
+        "lastActiveAt": { "type": "string", "format": "date-time" },
+        "lastLoginDevice": { "type": "string", "maxLength": 160 },
+        "lastLoginLocation": { "type": "string", "maxLength": 160 },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -203,6 +209,8 @@
         "content": { "type": "string", "maxLength": 5000 },
         "readTime": { "type": "string", "maxLength": 30 },
         "isPublished": { "type": "boolean" },
+        "createdByUid": { "type": "string", "maxLength": 128 },
+        "createdByName": { "type": "string", "maxLength": 100 },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -221,6 +229,8 @@
         "category": { "type": "string", "maxLength": 50 },
         "readTime": { "type": "string", "maxLength": 30 },
         "isPublished": { "type": "boolean" },
+        "createdByUid": { "type": "string", "maxLength": 128 },
+        "createdByName": { "type": "string", "maxLength": 100 },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -238,14 +248,38 @@
         "paymentBkashNumber": { "type": "string", "maxLength": 40 },
         "paymentNagadNumber": { "type": "string", "maxLength": 40 },
         "paymentInstructions": { "type": "string", "maxLength": 400 },
-        "recipeFontDesktop": { "type": "string", "enum": ["bensen", "atma", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "noto-sans"] },
-        "recipeFontMobile": { "type": "string", "enum": ["bensen", "atma", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "noto-sans"] },
-        "recipeFontSizeDesktop": { "type": "string", "enum": ["sm", "md", "lg", "xl"] },
-        "recipeFontSizeMobile": { "type": "string", "enum": ["sm", "md", "lg", "xl"] },
-        "adminFontFamily": { "type": "string", "enum": ["bensen", "atma", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "noto-sans"] },
-        "adminFontSize": { "type": "string", "enum": ["sm", "md", "lg", "xl"] },
-        "profileFontFamily": { "type": "string", "enum": ["bensen", "atma", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "noto-sans"] },
-        "profileFontSize": { "type": "string", "enum": ["sm", "md", "lg", "xl"] },
+        "recipeFontDesktop": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "recipeFontMobile": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "recipeFontSizeDesktop": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "recipeFontSizeMobile": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "adminFontFamily": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "adminFontMobile": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "adminFontSize": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "adminFontSizeMobile": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "profileFontFamily": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "profileFontMobile": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "profileFontSize": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "profileFontSizeMobile": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "checkoutFontFamily": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "checkoutFontMobile": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "checkoutFontSize": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "checkoutFontSizeMobile": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "homeFontFamily": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "homeFontMobile": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "homeFontSize": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "homeFontSizeMobile": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "pricingFontFamily": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "pricingFontMobile": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "pricingFontSize": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "pricingFontSizeMobile": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "blogTipsFontFamily": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "blogTipsFontMobile": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "blogTipsFontSize": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "blogTipsFontSizeMobile": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "authFontFamily": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "authFontMobile": { "type": "string", "enum": ["bensen", "atma", "alkatra", "galada", "tiro-italic", "noto-serif", "tiro", "hind-siliguri", "anek-bangla", "baloo-da-2", "mina", "noto-sans"] },
+        "authFontSize": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
+        "authFontSizeMobile": { "type": "string", "enum": ["100", "105", "110", "115", "120", "sm", "md", "lg", "xl"] },
         "seoTitle": { "type": "string", "maxLength": 120 },
         "seoDescription": { "type": "string", "maxLength": 320 },
         "seoKeywords": { "type": "string", "maxLength": 500 },
@@ -302,7 +336,7 @@
       "description": "User notification for comment replies and payment verification updates",
       "type": "object",
       "properties": {
-        "type": { "type": "string", "enum": ["comment_reply", "payment_approved", "payment_rejected", "payment_pending", "free_limit_reached", "pro_limit_reached", "plan_expiry_reminder"] },
+        "type": { "type": "string", "enum": ["comment_reply", "payment_approved", "payment_rejected", "payment_pending", "free_limit_reached", "pro_limit_reached", "plan_expiry_reminder", "admin_message"] },
         "title": { "type": "string", "minLength": 1, "maxLength": 140 },
         "message": { "type": "string", "minLength": 1, "maxLength": 400 },
         "recipeId": { "type": "string", "maxLength": 128 },
@@ -313,6 +347,54 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["type", "title", "message", "isRead", "createdAt"]
+    },
+    "RecycleBinItem": {
+      "title": "RecycleBinItem",
+      "description": "Soft-deleted recipe, tip, or blog post retained for 30 days before permanent deletion",
+      "type": "object",
+      "properties": {
+        "itemType": { "type": "string", "enum": ["recipe", "tip", "blog"] },
+        "originalId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "subtitle": { "type": "string", "maxLength": 320 },
+        "category": { "type": "string", "maxLength": 60 },
+        "payloadJson": { "type": "string", "maxLength": 900000 },
+        "deletedByUid": { "type": "string", "maxLength": 128 },
+        "deletedByName": { "type": "string", "maxLength": 100 },
+        "deletedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["itemType", "originalId", "title", "payloadJson", "deletedByUid", "deletedByName", "deletedAt", "expiresAt"]
+    },
+    "DirectMessageThread": {
+      "title": "DirectMessageThread",
+      "description": "Two-way direct chat metadata between an administrator and a registered user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$", "maxLength": 128 },
+        "userName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "userContact": { "type": "string", "maxLength": 160 },
+        "userPhotoURL": { "type": "string", "maxLength": 160000 },
+        "lastMessage": { "type": "string", "maxLength": 1000 },
+        "lastSenderRole": { "type": "string", "enum": ["admin", "user"] },
+        "unreadByAdmin": { "type": "integer" },
+        "unreadByUser": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "lastMessage", "lastSenderRole", "unreadByAdmin", "unreadByUser", "updatedAt"]
+    },
+    "DirectMessage": {
+      "title": "DirectMessage",
+      "description": "Individual message in an admin-user direct conversation",
+      "type": "object",
+      "properties": {
+        "senderUid": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$", "maxLength": 128 },
+        "senderName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "senderRole": { "type": "string", "enum": ["admin", "user"] },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderUid", "senderName", "senderRole", "text", "createdAt"]
     }
   },
   "firestore": {
@@ -367,6 +449,22 @@
     "/admins/{userId}": {
       "schema": { "$ref": "#/entities/AdminRecord" },
       "description": "Authorized administrator registry"
+    },
+    "/moderators/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Authorized moderator registry"
+    },
+    "/recycleBin/{itemId}": {
+      "schema": { "$ref": "#/entities/RecycleBinItem" },
+      "description": "30-day recycle bin for soft-deleted recipes, tips, and blog posts"
+    },
+    "/directThreads/{userId}": {
+      "schema": { "$ref": "#/entities/DirectMessageThread" },
+      "description": "Two-way direct message thread summary between admin and a user"
+    },
+    "/directThreads/{userId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/DirectMessage" },
+      "description": "Individual direct messages exchanged between admin and a user"
     }
   }
 }

@@ -18,7 +18,6 @@ import {
   User as UserIcon,
   X,
 } from 'lucide-react';
-import { FONT_SIZE_OPTIONS, RECIPE_FONT_OPTIONS } from '../data/seedData';
 import {
   changeUserPasswordDirect,
   formatUserContact,
@@ -26,10 +25,9 @@ import {
   updateUserProfilePhoto,
 } from '../services/firestoreService';
 import { compressImageFileToDataUrl } from '../utils/imageUpload';
+import { getResponsiveTypographyClass } from '../utils/typography';
 import type {
-  FontSizeKey,
   PageRoute,
-  RecipeFontKey,
   SiteSettings,
   UserProfile,
 } from '../types';
@@ -41,27 +39,6 @@ interface EditProfilePageProps {
   onProfileUpdated: (patch: Partial<UserProfile>) => void;
   onLogout: () => void;
   onToast?: (msg: string) => void;
-}
-
-const VALID_PROFILE_FONT_KEYS = new Set<RecipeFontKey>(
-  RECIPE_FONT_OPTIONS.map((opt) => opt.key)
-);
-const VALID_PROFILE_SIZE_KEYS = new Set<FontSizeKey>(
-  FONT_SIZE_OPTIONS.map((opt) => opt.key)
-);
-
-function resolveProfileFontKey(key?: string): RecipeFontKey {
-  if (key && VALID_PROFILE_FONT_KEYS.has(key as RecipeFontKey)) {
-    return key as RecipeFontKey;
-  }
-  return 'hind-siliguri';
-}
-
-function resolveProfileSizeKey(key?: string): FontSizeKey {
-  if (key && VALID_PROFILE_SIZE_KEYS.has(key as FontSizeKey)) {
-    return key as FontSizeKey;
-  }
-  return 'md';
 }
 
 function bengaliToEnglishDigits(input: string): string {
@@ -76,9 +53,12 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({
   onLogout,
   onToast,
 }) => {
-  const profileFontKey = resolveProfileFontKey(siteSettings?.profileFontFamily);
-  const profileSizeKey = resolveProfileSizeKey(siteSettings?.profileFontSize);
-  const profileScopeClass = `profile-typography-scope profile-font-${profileFontKey} profile-size-${profileSizeKey}`;
+  const profileScopeClass = getResponsiveTypographyClass(
+    siteSettings?.profileFontFamily,
+    siteSettings?.profileFontMobile,
+    siteSettings?.profileFontSize,
+    siteSettings?.profileFontSizeMobile
+  );
 
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [address, setAddress] = useState(user?.address || '');

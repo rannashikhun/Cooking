@@ -44,6 +44,20 @@
   --recipe-word-spacing: 0.1em;
   --recipe-letter-spacing: 0.01em;
 }
+.rf-m-alkatra {
+  --recipe-font-family: 'Alkatra', 'Noto Serif Bengali', serif;
+  --recipe-font-style: normal;
+  --recipe-heading-weight: 600;
+  --recipe-word-spacing: 0.06em;
+  --recipe-letter-spacing: 0.005em;
+}
+.rf-m-galada {
+  --recipe-font-family: 'Galada', 'Noto Serif Bengali', cursive, serif;
+  --recipe-font-style: normal;
+  --recipe-heading-weight: 400;
+  --recipe-word-spacing: 0.12em;
+  --recipe-letter-spacing: 0.01em;
+}
 .rf-m-tiro-italic {
   --recipe-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
   --recipe-font-style: italic;
@@ -72,6 +86,27 @@
   --recipe-word-spacing: 0.02em;
   --recipe-letter-spacing: normal;
 }
+.rf-m-anek-bangla {
+  --recipe-font-family: 'Anek Bangla', 'Hind Siliguri', system-ui, sans-serif;
+  --recipe-font-style: normal;
+  --recipe-heading-weight: 700;
+  --recipe-word-spacing: 0.02em;
+  --recipe-letter-spacing: normal;
+}
+.rf-m-baloo-da-2 {
+  --recipe-font-family: 'Baloo Da 2', 'Hind Siliguri', system-ui, sans-serif;
+  --recipe-font-style: normal;
+  --recipe-heading-weight: 700;
+  --recipe-word-spacing: 0.02em;
+  --recipe-letter-spacing: normal;
+}
+.rf-m-mina {
+  --recipe-font-family: 'Mina', 'Hind Siliguri', system-ui, sans-serif;
+  --recipe-font-style: normal;
+  --recipe-heading-weight: 700;
+  --recipe-word-spacing: 0.02em;
+  --recipe-letter-spacing: normal;
+}
 .rf-m-noto-sans {
   --recipe-font-family: 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
   --recipe-font-style: normal;
@@ -93,6 +128,20 @@
     --recipe-font-style: normal;
     --recipe-heading-weight: 600;
     --recipe-word-spacing: 0.1em;
+    --recipe-letter-spacing: 0.01em;
+  }
+  .rf-pc-alkatra {
+    --recipe-font-family: 'Alkatra', 'Noto Serif Bengali', serif;
+    --recipe-font-style: normal;
+    --recipe-heading-weight: 600;
+    --recipe-word-spacing: 0.06em;
+    --recipe-letter-spacing: 0.005em;
+  }
+  .rf-pc-galada {
+    --recipe-font-family: 'Galada', 'Noto Serif Bengali', cursive, serif;
+    --recipe-font-style: normal;
+    --recipe-heading-weight: 400;
+    --recipe-word-spacing: 0.12em;
     --recipe-letter-spacing: 0.01em;
   }
   .rf-pc-tiro-italic {
@@ -123,6 +172,27 @@
     --recipe-word-spacing: 0.02em;
     --recipe-letter-spacing: normal;
   }
+  .rf-pc-anek-bangla {
+    --recipe-font-family: 'Anek Bangla', 'Hind Siliguri', system-ui, sans-serif;
+    --recipe-font-style: normal;
+    --recipe-heading-weight: 700;
+    --recipe-word-spacing: 0.02em;
+    --recipe-letter-spacing: normal;
+  }
+  .rf-pc-baloo-da-2 {
+    --recipe-font-family: 'Baloo Da 2', 'Hind Siliguri', system-ui, sans-serif;
+    --recipe-font-style: normal;
+    --recipe-heading-weight: 700;
+    --recipe-word-spacing: 0.02em;
+    --recipe-letter-spacing: normal;
+  }
+  .rf-pc-mina {
+    --recipe-font-family: 'Mina', 'Hind Siliguri', system-ui, sans-serif;
+    --recipe-font-style: normal;
+    --recipe-heading-weight: 700;
+    --recipe-word-spacing: 0.02em;
+    --recipe-letter-spacing: normal;
+  }
   .rf-pc-noto-sans {
     --recipe-font-family: 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
     --recipe-font-style: normal;
@@ -147,168 +217,300 @@
   letter-spacing: var(--recipe-letter-spacing, 0.01em);
 }
 
-/* Dynamic Admin Panel Font & Font Size (Controlled from Admin Font Settings) */
-.admin-font-bensen {
-  --admin-font-family: 'Bensen Handwriting', 'Noto Serif Bengali', serif;
-  --admin-font-style: normal;
-  --admin-word-spacing: 0.14em;
-  --admin-letter-spacing: 0.01em;
+/* Unified Responsive Page Typography Scope (PC >= 768px & Mobile < 768px) */
+/* Mobile-first font definitions */
+.typo-m-font-bensen {
+  --page-font-family: 'Bensen Handwriting', 'Noto Serif Bengali', serif;
+  --page-font-style: normal;
+  --page-word-spacing: 0.14em;
+  --page-letter-spacing: 0.01em;
 }
-.admin-font-atma {
-  --admin-font-family: 'Atma', 'Noto Serif Bengali', cursive, serif;
-  --admin-font-style: normal;
-  --admin-word-spacing: 0.1em;
-  --admin-letter-spacing: 0.01em;
+.typo-m-font-atma {
+  --page-font-family: 'Atma', 'Noto Serif Bengali', cursive, serif;
+  --page-font-style: normal;
+  --page-word-spacing: 0.1em;
+  --page-letter-spacing: 0.01em;
 }
-.admin-font-tiro-italic {
-  --admin-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
-  --admin-font-style: italic;
-  --admin-word-spacing: 0.08em;
-  --admin-letter-spacing: 0.005em;
+.typo-m-font-alkatra {
+  --page-font-family: 'Alkatra', 'Noto Serif Bengali', serif;
+  --page-font-style: normal;
+  --page-word-spacing: 0.05em;
+  --page-letter-spacing: 0.005em;
 }
-.admin-font-noto-serif {
-  --admin-font-family: 'Noto Serif Bengali', Georgia, serif;
-  --admin-font-style: normal;
-  --admin-word-spacing: 0.03em;
-  --admin-letter-spacing: normal;
+.typo-m-font-galada {
+  --page-font-family: 'Galada', 'Noto Serif Bengali', cursive, serif;
+  --page-font-style: normal;
+  --page-word-spacing: 0.1em;
+  --page-letter-spacing: 0.01em;
 }
-.admin-font-tiro {
-  --admin-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
-  --admin-font-style: normal;
-  --admin-word-spacing: 0.04em;
-  --admin-letter-spacing: normal;
+.typo-m-font-tiro-italic {
+  --page-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+  --page-font-style: italic;
+  --page-word-spacing: 0.08em;
+  --page-letter-spacing: 0.005em;
 }
-.admin-font-hind-siliguri {
-  --admin-font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
-  --admin-font-style: normal;
-  --admin-word-spacing: normal;
-  --admin-letter-spacing: normal;
+.typo-m-font-noto-serif {
+  --page-font-family: 'Noto Serif Bengali', Georgia, serif;
+  --page-font-style: normal;
+  --page-word-spacing: 0.03em;
+  --page-letter-spacing: normal;
 }
-.admin-font-noto-sans {
-  --admin-font-family: 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
-  --admin-font-style: normal;
-  --admin-word-spacing: normal;
-  --admin-letter-spacing: normal;
+.typo-m-font-tiro {
+  --page-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+  --page-font-style: normal;
+  --page-word-spacing: 0.04em;
+  --page-letter-spacing: normal;
+}
+.typo-m-font-hind-siliguri {
+  --page-font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
+  --page-font-style: normal;
+  --page-word-spacing: normal;
+  --page-letter-spacing: normal;
+}
+.typo-m-font-anek-bangla {
+  --page-font-family: 'Anek Bangla', 'Hind Siliguri', system-ui, sans-serif;
+  --page-font-style: normal;
+  --page-word-spacing: normal;
+  --page-letter-spacing: normal;
+}
+.typo-m-font-baloo-da-2 {
+  --page-font-family: 'Baloo Da 2', 'Hind Siliguri', system-ui, sans-serif;
+  --page-font-style: normal;
+  --page-word-spacing: normal;
+  --page-letter-spacing: normal;
+}
+.typo-m-font-mina {
+  --page-font-family: 'Mina', 'Hind Siliguri', system-ui, sans-serif;
+  --page-font-style: normal;
+  --page-word-spacing: normal;
+  --page-letter-spacing: normal;
+}
+.typo-m-font-noto-sans {
+  --page-font-family: 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
+  --page-font-style: normal;
+  --page-word-spacing: normal;
+  --page-letter-spacing: normal;
 }
 
-.admin-size-sm { --admin-scale: 0.9; }
-.admin-size-md { --admin-scale: 1; }
-.admin-size-lg { --admin-scale: 1.12; }
-.admin-size-xl { --admin-scale: 1.24; }
+/* Mobile-first font size scale (100% to 120%) */
+.typo-m-size-100, .typo-m-size-sm, .typo-m-size-md { --page-scale: 1; }
+.typo-m-size-105 { --page-scale: 1.05; }
+.typo-m-size-110, .typo-m-size-lg { --page-scale: 1.1; }
+.typo-m-size-115 { --page-scale: 1.15; }
+.typo-m-size-120, .typo-m-size-xl { --page-scale: 1.2; }
 
-.admin-typography-scope {
-  font-family: var(--admin-font-family, 'Hind Siliguri', system-ui, -apple-system, sans-serif);
-  font-style: var(--admin-font-style, normal);
-  word-spacing: var(--admin-word-spacing, normal);
-  letter-spacing: var(--admin-letter-spacing, normal);
-  font-size: calc(1rem * var(--admin-scale, 1));
-  --font-sans: var(--admin-font-family, 'Hind Siliguri', system-ui, -apple-system, sans-serif);
-  --font-display: var(--admin-font-family, 'Noto Serif Bengali', 'Hind Siliguri', serif);
-  --font-book: var(--admin-font-family, 'Noto Serif Bengali', Georgia, serif);
-  --text-xs: calc(0.75rem * var(--admin-scale, 1));
-  --text-sm: calc(0.875rem * var(--admin-scale, 1));
-  --text-base: calc(1rem * var(--admin-scale, 1));
-  --text-lg: calc(1.125rem * var(--admin-scale, 1));
-  --text-xl: calc(1.25rem * var(--admin-scale, 1));
-  --text-2xl: calc(1.5rem * var(--admin-scale, 1));
-  --text-3xl: calc(1.875rem * var(--admin-scale, 1));
+/* Desktop / PC overrides (>= 768px) */
+@media (min-width: 768px) {
+  .typo-pc-font-bensen {
+    --page-font-family: 'Bensen Handwriting', 'Noto Serif Bengali', serif;
+    --page-font-style: normal;
+    --page-word-spacing: 0.14em;
+    --page-letter-spacing: 0.01em;
+  }
+  .typo-pc-font-atma {
+    --page-font-family: 'Atma', 'Noto Serif Bengali', cursive, serif;
+    --page-font-style: normal;
+    --page-word-spacing: 0.1em;
+    --page-letter-spacing: 0.01em;
+  }
+  .typo-pc-font-alkatra {
+    --page-font-family: 'Alkatra', 'Noto Serif Bengali', serif;
+    --page-font-style: normal;
+    --page-word-spacing: 0.05em;
+    --page-letter-spacing: 0.005em;
+  }
+  .typo-pc-font-galada {
+    --page-font-family: 'Galada', 'Noto Serif Bengali', cursive, serif;
+    --page-font-style: normal;
+    --page-word-spacing: 0.1em;
+    --page-letter-spacing: 0.01em;
+  }
+  .typo-pc-font-tiro-italic {
+    --page-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+    --page-font-style: italic;
+    --page-word-spacing: 0.08em;
+    --page-letter-spacing: 0.005em;
+  }
+  .typo-pc-font-noto-serif {
+    --page-font-family: 'Noto Serif Bengali', Georgia, serif;
+    --page-font-style: normal;
+    --page-word-spacing: 0.03em;
+    --page-letter-spacing: normal;
+  }
+  .typo-pc-font-tiro {
+    --page-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+    --page-font-style: normal;
+    --page-word-spacing: 0.04em;
+    --page-letter-spacing: normal;
+  }
+  .typo-pc-font-hind-siliguri {
+    --page-font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
+    --page-font-style: normal;
+    --page-word-spacing: normal;
+    --page-letter-spacing: normal;
+  }
+  .typo-pc-font-anek-bangla {
+    --page-font-family: 'Anek Bangla', 'Hind Siliguri', system-ui, sans-serif;
+    --page-font-style: normal;
+    --page-word-spacing: normal;
+    --page-letter-spacing: normal;
+  }
+  .typo-pc-font-baloo-da-2 {
+    --page-font-family: 'Baloo Da 2', 'Hind Siliguri', system-ui, sans-serif;
+    --page-font-style: normal;
+    --page-word-spacing: normal;
+    --page-letter-spacing: normal;
+  }
+  .typo-pc-font-mina {
+    --page-font-family: 'Mina', 'Hind Siliguri', system-ui, sans-serif;
+    --page-font-style: normal;
+    --page-word-spacing: normal;
+    --page-letter-spacing: normal;
+  }
+  .typo-pc-font-noto-sans {
+    --page-font-family: 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
+    --page-font-style: normal;
+    --page-word-spacing: normal;
+    --page-letter-spacing: normal;
+  }
+
+  .typo-pc-size-100, .typo-pc-size-sm, .typo-pc-size-md { --page-scale: 1; }
+  .typo-pc-size-105 { --page-scale: 1.05; }
+  .typo-pc-size-110, .typo-pc-size-lg { --page-scale: 1.1; }
+  .typo-pc-size-115 { --page-scale: 1.15; }
+  .typo-pc-size-120, .typo-pc-size-xl { --page-scale: 1.2; }
 }
 
-.admin-typography-scope input,
-.admin-typography-scope textarea,
-.admin-typography-scope select,
-.admin-typography-scope button {
+/* Single-device preview overrides (always win inside nested admin preview cards) */
+.typo-font-bensen {
+  --page-font-family: 'Bensen Handwriting', 'Noto Serif Bengali', serif;
+  --page-font-style: normal;
+  --page-word-spacing: 0.14em;
+  --page-letter-spacing: 0.01em;
+}
+.typo-font-atma {
+  --page-font-family: 'Atma', 'Noto Serif Bengali', cursive, serif;
+  --page-font-style: normal;
+  --page-word-spacing: 0.1em;
+  --page-letter-spacing: 0.01em;
+}
+.typo-font-alkatra {
+  --page-font-family: 'Alkatra', 'Noto Serif Bengali', serif;
+  --page-font-style: normal;
+  --page-word-spacing: 0.05em;
+  --page-letter-spacing: 0.005em;
+}
+.typo-font-galada {
+  --page-font-family: 'Galada', 'Noto Serif Bengali', cursive, serif;
+  --page-font-style: normal;
+  --page-word-spacing: 0.1em;
+  --page-letter-spacing: 0.01em;
+}
+.typo-font-tiro-italic {
+  --page-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+  --page-font-style: italic;
+  --page-word-spacing: 0.08em;
+  --page-letter-spacing: 0.005em;
+}
+.typo-font-noto-serif {
+  --page-font-family: 'Noto Serif Bengali', Georgia, serif;
+  --page-font-style: normal;
+  --page-word-spacing: 0.03em;
+  --page-letter-spacing: normal;
+}
+.typo-font-tiro {
+  --page-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
+  --page-font-style: normal;
+  --page-word-spacing: 0.04em;
+  --page-letter-spacing: normal;
+}
+.typo-font-hind-siliguri {
+  --page-font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
+  --page-font-style: normal;
+  --page-word-spacing: normal;
+  --page-letter-spacing: normal;
+}
+.typo-font-anek-bangla {
+  --page-font-family: 'Anek Bangla', 'Hind Siliguri', system-ui, sans-serif;
+  --page-font-style: normal;
+  --page-word-spacing: normal;
+  --page-letter-spacing: normal;
+}
+.typo-font-baloo-da-2 {
+  --page-font-family: 'Baloo Da 2', 'Hind Siliguri', system-ui, sans-serif;
+  --page-font-style: normal;
+  --page-word-spacing: normal;
+  --page-letter-spacing: normal;
+}
+.typo-font-mina {
+  --page-font-family: 'Mina', 'Hind Siliguri', system-ui, sans-serif;
+  --page-font-style: normal;
+  --page-word-spacing: normal;
+  --page-letter-spacing: normal;
+}
+.typo-font-noto-sans {
+  --page-font-family: 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
+  --page-font-style: normal;
+  --page-word-spacing: normal;
+  --page-letter-spacing: normal;
+}
+
+.typo-size-100, .typo-size-sm, .typo-size-md { --page-scale: 1; }
+.typo-size-105 { --page-scale: 1.05; }
+.typo-size-110, .typo-size-lg { --page-scale: 1.1; }
+.typo-size-115 { --page-scale: 1.15; }
+.typo-size-120, .typo-size-xl { --page-scale: 1.2; }
+
+.page-typo-scope {
+  font-family: var(--page-font-family, 'Hind Siliguri', system-ui, -apple-system, sans-serif);
+  font-style: var(--page-font-style, normal);
+  word-spacing: var(--page-word-spacing, normal);
+  letter-spacing: var(--page-letter-spacing, normal);
+  font-size: calc(1rem * var(--page-scale, 1));
+  --font-sans: var(--page-font-family, 'Hind Siliguri', system-ui, -apple-system, sans-serif);
+  --font-display: var(--page-font-family, 'Noto Serif Bengali', 'Hind Siliguri', serif);
+  --font-book: var(--page-font-family, 'Noto Serif Bengali', Georgia, serif);
+  --text-xs: calc(0.75rem * var(--page-scale, 1));
+  --text-sm: calc(0.875rem * var(--page-scale, 1));
+  --text-base: calc(1rem * var(--page-scale, 1));
+  --text-lg: calc(1.125rem * var(--page-scale, 1));
+  --text-xl: calc(1.25rem * var(--page-scale, 1));
+  --text-2xl: calc(1.5rem * var(--page-scale, 1));
+  --text-3xl: calc(1.875rem * var(--page-scale, 1));
+  --text-4xl: calc(2.25rem * var(--page-scale, 1));
+  --text-5xl: calc(3rem * var(--page-scale, 1));
+}
+
+.page-typo-scope .font-display-bn,
+.page-typo-scope .font-book-bn {
+  font-family: var(--page-font-family, 'Hind Siliguri', system-ui, -apple-system, sans-serif);
+  font-style: var(--page-font-style, normal);
+}
+
+.page-typo-scope input,
+.page-typo-scope textarea,
+.page-typo-scope select,
+.page-typo-scope button {
   font-family: inherit;
 }
 
-/* Dynamic User Profile Font & Font Size (Controlled from Admin Font Settings) */
-.profile-font-bensen {
-  --profile-font-family: 'Bensen Handwriting', 'Noto Serif Bengali', serif;
-  --profile-font-style: normal;
-  --profile-word-spacing: 0.14em;
-  --profile-letter-spacing: 0.01em;
-}
-.profile-font-atma {
-  --profile-font-family: 'Atma', 'Noto Serif Bengali', cursive, serif;
-  --profile-font-style: normal;
-  --profile-word-spacing: 0.1em;
-  --profile-letter-spacing: 0.01em;
-}
-.profile-font-tiro-italic {
-  --profile-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
-  --profile-font-style: italic;
-  --profile-word-spacing: 0.08em;
-  --profile-letter-spacing: 0.005em;
-}
-.profile-font-noto-serif {
-  --profile-font-family: 'Noto Serif Bengali', Georgia, serif;
-  --profile-font-style: normal;
-  --profile-word-spacing: 0.03em;
-  --profile-letter-spacing: normal;
-}
-.profile-font-tiro {
-  --profile-font-family: 'Tiro Bangla', 'Noto Serif Bengali', Georgia, serif;
-  --profile-font-style: normal;
-  --profile-word-spacing: 0.04em;
-  --profile-letter-spacing: normal;
-}
-.profile-font-hind-siliguri {
-  --profile-font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
-  --profile-font-style: normal;
-  --profile-word-spacing: normal;
-  --profile-letter-spacing: normal;
-}
-.profile-font-noto-sans {
-  --profile-font-family: 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
-  --profile-font-style: normal;
-  --profile-word-spacing: normal;
-  --profile-letter-spacing: normal;
-}
-
-.profile-size-sm { --profile-scale: 0.9; }
-.profile-size-md { --profile-scale: 1; }
-.profile-size-lg { --profile-scale: 1.12; }
-.profile-size-xl { --profile-scale: 1.24; }
-
-.profile-typography-scope {
-  font-family: var(--profile-font-family, 'Hind Siliguri', system-ui, -apple-system, sans-serif);
-  font-style: var(--profile-font-style, normal);
-  word-spacing: var(--profile-word-spacing, normal);
-  letter-spacing: var(--profile-letter-spacing, normal);
-  font-size: calc(1rem * var(--profile-scale, 1));
-  --font-sans: var(--profile-font-family, 'Hind Siliguri', system-ui, -apple-system, sans-serif);
-  --font-display: var(--profile-font-family, 'Noto Serif Bengali', 'Hind Siliguri', serif);
-  --font-book: var(--profile-font-family, 'Noto Serif Bengali', Georgia, serif);
-  --text-xs: calc(0.75rem * var(--profile-scale, 1));
-  --text-sm: calc(0.875rem * var(--profile-scale, 1));
-  --text-base: calc(1rem * var(--profile-scale, 1));
-  --text-lg: calc(1.125rem * var(--profile-scale, 1));
-  --text-xl: calc(1.25rem * var(--profile-scale, 1));
-  --text-2xl: calc(1.5rem * var(--profile-scale, 1));
-  --text-3xl: calc(1.875rem * var(--profile-scale, 1));
-}
-
-.profile-typography-scope input,
-.profile-typography-scope textarea,
-.profile-typography-scope select,
-.profile-typography-scope button {
-  font-family: inherit;
-}
-
-/* Dynamic Responsive Recipe Post Font Size (PC & Mobile Separately) */
-.rf-size-m-sm { --rf-scale: 0.9; }
-.rf-size-m-md { --rf-scale: 1; }
-.rf-size-m-lg { --rf-scale: 1.12; }
-.rf-size-m-xl { --rf-scale: 1.24; }
+/* Dynamic Responsive Recipe Post Font Size (PC & Mobile Separately, 100% to 120%) */
+.rf-size-m-100, .rf-size-m-sm, .rf-size-m-md { --rf-scale: 1; }
+.rf-size-m-105 { --rf-scale: 1.05; }
+.rf-size-m-110, .rf-size-m-lg { --rf-scale: 1.1; }
+.rf-size-m-115 { --rf-scale: 1.15; }
+.rf-size-m-120, .rf-size-m-xl { --rf-scale: 1.2; }
 
 @media (min-width: 768px) {
-  .rf-size-pc-sm { --rf-scale: 0.9; }
-  .rf-size-pc-md { --rf-scale: 1; }
-  .rf-size-pc-lg { --rf-scale: 1.12; }
-  .rf-size-pc-xl { --rf-scale: 1.24; }
+  .rf-size-pc-100, .rf-size-pc-sm, .rf-size-pc-md { --rf-scale: 1; }
+  .rf-size-pc-105 { --rf-scale: 1.05; }
+  .rf-size-pc-110, .rf-size-pc-lg { --rf-scale: 1.1; }
+  .rf-size-pc-115 { --rf-scale: 1.15; }
+  .rf-size-pc-120, .rf-size-pc-xl { --rf-scale: 1.2; }
 }
 
 .rf-size-scope {
+  font-size: calc(1rem * var(--rf-scale, 1));
   --text-xs: calc(0.75rem * var(--rf-scale, 1));
   --text-sm: calc(0.875rem * var(--rf-scale, 1));
   --text-base: calc(1rem * var(--rf-scale, 1));
@@ -317,6 +519,57 @@
   --text-2xl: calc(1.5rem * var(--rf-scale, 1));
   --text-3xl: calc(1.875rem * var(--rf-scale, 1));
   --text-4xl: calc(2.25rem * var(--rf-scale, 1));
+}
+
+/* Scaled Recipe Diary text sizes so 100%-120% visibly scales titles, ingredients, steps, and tips */
+.rf-diary-title {
+  font-size: calc(28px * var(--rf-scale, 1));
+}
+.rf-diary-subtitle {
+  font-size: calc(17px * var(--rf-scale, 1));
+}
+.rf-diary-section-title {
+  font-size: calc(22px * var(--rf-scale, 1));
+}
+.rf-diary-ingredient {
+  font-size: calc(16px * var(--rf-scale, 1));
+}
+.rf-diary-step {
+  font-size: calc(17.5px * var(--rf-scale, 1));
+  line-height: calc(34px * var(--rf-scale, 1));
+}
+.rf-diary-tip {
+  font-size: calc(16.5px * var(--rf-scale, 1));
+}
+.rf-diary-lightbox {
+  font-size: calc(16px * var(--rf-scale, 1));
+  line-height: calc(30px * var(--rf-scale, 1));
+}
+
+@media (min-width: 640px) {
+  .rf-diary-title {
+    font-size: calc(40px * var(--rf-scale, 1));
+  }
+  .rf-diary-subtitle {
+    font-size: calc(19px * var(--rf-scale, 1));
+  }
+  .rf-diary-section-title {
+    font-size: calc(26px * var(--rf-scale, 1));
+  }
+  .rf-diary-ingredient {
+    font-size: calc(17.5px * var(--rf-scale, 1));
+  }
+  .rf-diary-step {
+    font-size: calc(19px * var(--rf-scale, 1));
+    line-height: calc(34px * var(--rf-scale, 1));
+  }
+  .rf-diary-tip {
+    font-size: calc(18px * var(--rf-scale, 1));
+  }
+  .rf-diary-lightbox {
+    font-size: calc(17.5px * var(--rf-scale, 1));
+    line-height: calc(30px * var(--rf-scale, 1));
+  }
 }
 
 .font-numeral-bn {

@@ -18,6 +18,7 @@ import {
   LogOut,
   Mail,
   MapPin,
+  MessageCircle,
   MessageSquare,
   Pencil,
   Phone,
@@ -26,8 +27,8 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import { FONT_SIZE_OPTIONS, RECIPE_FONT_OPTIONS } from '../data/seedData';
 import { db, handleFirestoreError, OperationType } from '../firebase';
+import { UserAdminChatPanel } from './UserAdminChatPanel';
 import {
   FREE_RECIPE_LIMIT,
   formatUserContact,
@@ -40,11 +41,10 @@ import {
   updateUserProfilePhoto,
 } from '../services/firestoreService';
 import { compressImageFileToDataUrl } from '../utils/imageUpload';
+import { getResponsiveTypographyClass } from '../utils/typography';
 import type {
-  FontSizeKey,
   PageRoute,
   Recipe,
-  RecipeFontKey,
   SiteSettings,
   SubscriptionOrder,
   SubscriptionPlan,
@@ -58,32 +58,14 @@ interface ProfileViewProps {
   plans?: SubscriptionPlan[];
   siteSettings?: SiteSettings;
   notifications?: UserNotification[];
+  unreadDirectMessagesCount?: number;
+  initialNotifTab?: 'notifications' | 'messages';
+  initialNotifTabNonce?: number;
   onNotificationClick?: (notif: UserNotification) => void;
   onMarkAllNotificationsRead?: () => void;
   onLogout: () => void;
   onNavigate: (route: PageRoute) => void;
   onPhotoUpdated?: (photoURL: string) => void;
-}
-
-const VALID_PROFILE_FONT_KEYS = new Set<RecipeFontKey>(
-  RECIPE_FONT_OPTIONS.map((opt) => opt.key)
-);
-const VALID_PROFILE_SIZE_KEYS = new Set<FontSizeKey>(
-  FONT_SIZE_OPTIONS.map((opt) => opt.key)
-);
-
-function resolveProfileFontKey(key?: string): RecipeFontKey {
-  if (key && VALID_PROFILE_FONT_KEYS.has(key as RecipeFontKey)) {
-    return key as RecipeFontKey;
-  }
-  return 'hind-siliguri';
-}
-
-function resolveProfileSizeKey(key?: string): FontSizeKey {
-  if (key && VALID_PROFILE_SIZE_KEYS.has(key as FontSizeKey)) {
-    return key as FontSizeKey;
-  }
-  return 'md';
 }
 
 const toBengaliDigits = (val: string | number): string => {
@@ -202,18 +184,25 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   plans = [],
   siteSettings,
   notifications = [],
+  unreadDirectMessagesCount = 0,
+  initialNotifTab = 'notifications',
+  initialNotifTabNonce = 0,
   onNotificationClick,
   onMarkAllNotificationsRead,
   onLogout,
   onNavigate,
   onPhotoUpdated,
 }) => {
-  const profileFontKey = resolveProfileFontKey(siteSettings?.profileFontFamily);
-  const profileSizeKey = resolveProfileSizeKey(siteSettings?.profileFontSize);
-  const profileScopeClass = `profile-typography-scope profile-font-${profileFontKey} profile-size-${profileSizeKey}`;
+  const profileScopeClass = getResponsiveTypographyClass(
+    siteSettings?.profileFontFamily,
+    siteSettings?.profileFontMobile,
+    siteSettings?.profileFontSize,
+    siteSettings?.profileFontSizeMobile
+  );
 
   const [orders, setOrders] = useState<SubscriptionOrder[]>([]);
   const [activeRecipeTab, setActiveRecipeTab] = useState<'free' | 'premium' | 'favorites'>('free');
+  const [commsTab, setCommsTab] = useState<'notifications' | 'messages'>(initialNotifTab);
   const [preparingPhoto, setPreparingPhoto] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null);
@@ -222,7 +211,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const commsCardRef = useRef<HTMLDivElement>(null);
   const photoInputId = 'profile-view-photo-input';
+
+  useEffect(() => {
+    setCommsTab(initialNotifTab);
+    if (initialNotifTabNonce > 0 && initialNotifTab === 'messages') {
+      window.setTimeout(() => {
+        commsCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 120);
+    }
+  }, [initialNotifTab, initialNotifTabNonce]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -532,14 +531,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
 
           <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
-            {user.role === 'admin' && (
+            {(user.role === 'admin' || user.role === 'moderator') && (
               <button
                 type="button"
                 onClick={() => onNavigate({ page: 'admin' })}
                 className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#1B4D24] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
               >
                 <ShieldCheck className="w-4 h-4 shrink-0" />
-                এডমিন প্যানেল
+                {user.role === 'admin' ? 'এডমিন প্যানেল' : 'মোডারেটর প্যানেল'}
               </button>
             )}
             <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2.5 w-full sm:w-auto">
@@ -583,21 +582,62 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         )}
       </div>
 
-      {/* User Notifications: Comment Replies & Payment Updates */}
-      <div className="bg-white rounded-3xl border border-gray-200 p-6 sm:p-7">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2">
-            <Bell className="w-5 h-5 text-[#1B4D24]" />
-            <h2 className="font-display-bn text-lg font-bold text-[#1A1A1A]">
-              নোটিফিকেশন ({toBengaliDigits(notifications.length)})
-            </h2>
-            {unreadNotifCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-[#B92B27] text-white text-[11px] font-bold tabular-nums">
-                {toBengaliDigits(unreadNotifCount)} নতুন
-              </span>
-            )}
+      {/* User Notifications & Direct Admin Messages */}
+      <div
+        ref={commsCardRef}
+        className="bg-white rounded-3xl border border-gray-200 p-5 sm:p-7 space-y-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex items-center gap-1.5 p-1 rounded-2xl bg-[#F4F5F2] border border-gray-200/80">
+            <button
+              type="button"
+              onClick={() => setCommsTab('notifications')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold cursor-pointer transition-all ${
+                commsTab === 'notifications'
+                  ? 'bg-[#1B4D24] text-white shadow-xs'
+                  : 'text-gray-700 hover:bg-white/80'
+              }`}
+            >
+              <Bell className="w-4 h-4 shrink-0" />
+              <span>নোটিফিকেশন ({toBengaliDigits(notifications.length)})</span>
+              {unreadNotifCount > 0 && (
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold tabular-nums ${
+                    commsTab === 'notifications'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-[#B92B27] text-white'
+                  }`}
+                >
+                  {toBengaliDigits(unreadNotifCount)} নতুন
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setCommsTab('messages')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold cursor-pointer transition-all ${
+                commsTab === 'messages'
+                  ? 'bg-[#1B4D24] text-white shadow-xs'
+                  : 'text-gray-700 hover:bg-white/80'
+              }`}
+            >
+              <MessageCircle className="w-4 h-4 shrink-0" />
+              <span>মেসেজ</span>
+              {unreadDirectMessagesCount > 0 && (
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold tabular-nums ${
+                    commsTab === 'messages'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-[#B92B27] text-white'
+                  }`}
+                >
+                  {toBengaliDigits(unreadDirectMessagesCount)} নতুন
+                </span>
+              )}
+            </button>
           </div>
-          {unreadNotifCount > 0 && onMarkAllNotificationsRead && (
+
+          {commsTab === 'notifications' && unreadNotifCount > 0 && onMarkAllNotificationsRead && (
             <button
               type="button"
               onClick={onMarkAllNotificationsRead}
@@ -609,9 +649,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           )}
         </div>
 
-        {notifications.length === 0 ? (
+        {commsTab === 'messages' ? (
+          <UserAdminChatPanel
+            user={user}
+            siteName={siteSettings?.siteName}
+            adminContactEmail={siteSettings?.contactEmail}
+          />
+        ) : notifications.length === 0 ? (
           <p className="text-sm text-gray-500 py-3">
-            এখনো কোনো নোটিফিকেশন নেই। আপনার মন্তব্যের রিপ্লাই বা পেমেন্ট যাচাইয়ের আপডেট এখানে পাবেন।
+            এখনো কোনো নোটিফিকেশন নেই। আপনার মন্তব্যের রিপ্লাই, পেমেন্ট আপডেট বা এডমিনের মেসেজের নোটিফিকেশন এখানে পাবেন।
           </p>
         ) : (
           <div className="space-y-2.5">
@@ -619,7 +665,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <button
                 key={n.id}
                 type="button"
-                onClick={() => onNotificationClick?.(n)}
+                onClick={() => {
+                  if (n.type === 'admin_message') {
+                    onNotificationClick?.(n);
+                    setCommsTab('messages');
+                    return;
+                  }
+                  onNotificationClick?.(n);
+                }}
                 className={`w-full text-left p-3.5 rounded-2xl border flex items-start gap-3 transition-colors cursor-pointer ${
                   n.isRead
                     ? 'bg-[#FAFAF8] border-gray-100 hover:border-gray-300'
@@ -628,20 +681,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               >
                 <div
                   className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                    n.type === 'comment_reply'
-                      ? 'bg-[#1B4D24]/12 text-[#1B4D24]'
-                      : n.type === 'payment_approved'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : n.type === 'payment_rejected' || n.type === 'free_limit_reached'
-                          ? 'bg-red-100 text-red-600'
-                          : n.type === 'pro_limit_reached'
-                            ? 'bg-amber-100 text-[#9A6E04]'
-                            : n.type === 'plan_expiry_reminder'
-                              ? 'bg-orange-100 text-orange-700'
-                              : 'bg-amber-100 text-amber-700'
+                    n.type === 'admin_message'
+                      ? 'bg-[#1B4D24] text-white'
+                      : n.type === 'comment_reply'
+                        ? 'bg-[#1B4D24]/12 text-[#1B4D24]'
+                        : n.type === 'payment_approved'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : n.type === 'payment_rejected' || n.type === 'free_limit_reached'
+                            ? 'bg-red-100 text-red-600'
+                            : n.type === 'pro_limit_reached'
+                              ? 'bg-amber-100 text-[#9A6E04]'
+                              : n.type === 'plan_expiry_reminder'
+                                ? 'bg-orange-100 text-orange-700'
+                                : 'bg-amber-100 text-amber-700'
                   }`}
                 >
-                  {n.type === 'comment_reply' ? (
+                  {n.type === 'admin_message' ? (
+                    <MessageCircle className="w-4 h-4" />
+                  ) : n.type === 'comment_reply' ? (
                     <MessageSquare className="w-4 h-4" />
                   ) : n.type === 'payment_approved' ? (
                     <CheckCircle2 className="w-4 h-4" />
@@ -666,7 +723,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <p className="text-xs sm:text-sm text-gray-700 mt-1 leading-relaxed">
                     {n.message}
                   </p>
-                  {n.recipeId ? (
+                  {n.type === 'admin_message' ? (
+                    <p className="text-xs font-bold text-[#1B4D24] mt-1">
+                      মেসেজ ট্যাবে উত্তর দিন →
+                    </p>
+                  ) : n.recipeId ? (
                     <p className="text-xs font-bold text-[#1B4D24] mt-1">
                       রেসিপি পোস্টে যান →
                     </p>

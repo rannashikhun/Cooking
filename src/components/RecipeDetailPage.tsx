@@ -7,7 +7,7 @@ import {
   query,
   Timestamp,
 } from 'firebase/firestore';
-import { FONT_SIZE_OPTIONS, RECIPE_FONT_OPTIONS, SEED_RECIPES } from '../data/seedData';
+import { SEED_RECIPES } from '../data/seedData';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -50,13 +50,12 @@ import {
   saveLocalRecipeRead,
 } from '../services/firestoreService';
 import { shareCurrentPage } from '../utils/seoMeta';
+import { getRecipeTypographyClass } from '../utils/typography';
 import type {
-  FontSizeKey,
   PageRoute,
   Recipe,
   RecipeComment,
   RecipeContent,
-  RecipeFontKey,
   RecipeHistoryEntry,
   SiteSettings,
   SubscriptionPlan,
@@ -78,28 +77,6 @@ interface RecipeDetailPageProps {
   onToast?: (msg: string) => void;
   plans: SubscriptionPlan[];
   siteSettings?: SiteSettings;
-}
-
-const VALID_RECIPE_FONT_KEYS = new Set<RecipeFontKey>(
-  RECIPE_FONT_OPTIONS.map((opt) => opt.key)
-);
-
-const VALID_FONT_SIZE_KEYS = new Set<FontSizeKey>(
-  FONT_SIZE_OPTIONS.map((opt) => opt.key)
-);
-
-function resolveRecipeFontKey(key?: string): RecipeFontKey {
-  if (key && VALID_RECIPE_FONT_KEYS.has(key as RecipeFontKey)) {
-    return key as RecipeFontKey;
-  }
-  return 'bensen';
-}
-
-function resolveFontSizeKey(key?: string): FontSizeKey {
-  if (key && VALID_FONT_SIZE_KEYS.has(key as FontSizeKey)) {
-    return key as FontSizeKey;
-  }
-  return 'md';
 }
 
 const toBengaliDigits = (val: string | number): string => {
@@ -142,11 +119,12 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
   plans,
   siteSettings,
 }) => {
-  const desktopFontKey = resolveRecipeFontKey(siteSettings?.recipeFontDesktop);
-  const mobileFontKey = resolveRecipeFontKey(siteSettings?.recipeFontMobile);
-  const desktopFontSizeKey = resolveFontSizeKey(siteSettings?.recipeFontSizeDesktop);
-  const mobileFontSizeKey = resolveFontSizeKey(siteSettings?.recipeFontSizeMobile);
-  const recipeFontScopeClass = `rf-m-${mobileFontKey} rf-pc-${desktopFontKey} rf-size-scope rf-size-m-${mobileFontSizeKey} rf-size-pc-${desktopFontSizeKey}`;
+  const recipeFontScopeClass = getRecipeTypographyClass(
+    siteSettings?.recipeFontDesktop,
+    siteSettings?.recipeFontMobile,
+    siteSettings?.recipeFontSizeDesktop,
+    siteSettings?.recipeFontSizeMobile
+  );
   const [content, setContent] = useState<RecipeContent | null>(null);
   const [locked, setLocked] = useState(false);
   const [lockReason, setLockReason] = useState<
@@ -789,12 +767,12 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
               </span>
             </div>
 
-            <h1 className="font-recipe-diary-heading text-[28px] sm:text-[40px] text-[#1F1A14] leading-[1.35] text-balance">
+            <h1 className="font-recipe-diary-heading rf-diary-title text-[#1F1A14] leading-[1.35] text-balance">
               {recipe.title}
             </h1>
 
             {recipe.subtitle && (
-              <p className="font-recipe-diary text-[17px] sm:text-[19px] text-[#453C32] leading-[1.9] max-w-2xl whitespace-pre-wrap break-words">
+              <p className="font-recipe-diary rf-diary-subtitle text-[#453C32] leading-[1.9] max-w-2xl whitespace-pre-wrap break-words">
                 {recipe.subtitle}
               </p>
             )}
@@ -978,7 +956,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
               {/* 01. Ingredients Checklist Section (Side-by-Side Above Steps) */}
               <section className="space-y-3.5">
                 <div className="flex items-baseline justify-between gap-2 pb-2 border-b border-dashed border-[#DFD6C0]">
-                  <h2 className="font-recipe-diary-heading text-[22px] sm:text-[26px] text-[#1F1A14]">
+                  <h2 className="font-recipe-diary-heading rf-diary-section-title text-[#1F1A14]">
                     প্রয়োজনীয় উপকরণ
                   </h2>
                   <span className="font-sans text-xs font-medium text-[#7A6F60] tabular-nums">
@@ -1008,7 +986,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
                             <Square className="w-4 h-4 text-[#8C8070] shrink-0 mt-1" />
                           )}
                           <span
-                            className={`font-recipe-diary text-[16px] sm:text-[17.5px] leading-snug ${
+                            className={`font-recipe-diary rf-diary-ingredient leading-snug ${
                               checked ? 'line-through text-[#8C8070]' : 'text-[#241E17]'
                             }`}
                           >
@@ -1024,7 +1002,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
               {/* 02. Full-Width Diary Step-by-Step Instructions */}
               <section className="space-y-5">
                 <div className="flex items-baseline justify-between gap-2 pb-2 border-b border-dashed border-[#DFD6C0]">
-                  <h2 className="font-recipe-diary-heading text-[22px] sm:text-[26px] text-[#1F1A14]">
+                  <h2 className="font-recipe-diary-heading rf-diary-section-title text-[#1F1A14]">
                     প্রস্তুত প্রণালী (ধাপে ধাপে)
                   </h2>
                   <span className="font-sans text-xs font-medium text-[#7A6F60] tabular-nums">
@@ -1082,7 +1060,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
                           </button>
                         )}
 
-                        <p className="font-recipe-diary text-[17.5px] sm:text-[19px] font-normal text-[#241E17] leading-[34px] bg-[repeating-linear-gradient(transparent,transparent_33px,#EFE8D6_34px)] whitespace-pre-wrap break-words">
+                        <p className="font-recipe-diary rf-diary-step font-normal text-[#241E17] bg-[repeating-linear-gradient(transparent,transparent_33px,#EFE8D6_34px)] whitespace-pre-wrap break-words">
                           {step}
                         </p>
                       </li>
@@ -1095,7 +1073,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
               {content.chefTip && (
                 <aside className="p-5 sm:p-6 rounded-2xl bg-[#F1F6EF] border border-[#1B4D24]/20 space-y-1.5">
                   <p className="font-recipe-diary-heading text-base text-[#1B4D24]">শেফের বিশেষ টিপস</p>
-                  <p className="font-recipe-diary text-[16.5px] sm:text-[18px] text-[#241E17] leading-[1.9] whitespace-pre-wrap break-words">
+                  <p className="font-recipe-diary rf-diary-tip text-[#241E17] leading-[1.9] whitespace-pre-wrap break-words">
                     {content.chefTip}
                   </p>
                 </aside>
@@ -1536,7 +1514,7 @@ export const RecipeDetailPage: React.FC<RecipeDetailPageProps> = ({
                         : 'animate-diary-fade'
                   }`}
                 >
-                  <p className="font-recipe-diary text-[16px] sm:text-[17.5px] text-[#2D2720] leading-[30px] bg-[repeating-linear-gradient(transparent,transparent_29px,#EFE8D6_30px)] whitespace-pre-wrap break-words">
+                  <p className="font-recipe-diary rf-diary-lightbox text-[#2D2720] bg-[repeating-linear-gradient(transparent,transparent_29px,#EFE8D6_30px)] whitespace-pre-wrap break-words">
                     {lightboxImage.caption}
                   </p>
                 </div>
