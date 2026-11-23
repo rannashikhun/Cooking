@@ -388,37 +388,7 @@ export function formatUserContact(email: string, phoneNumber?: string): string {
   return email;
 }
 
-const inFlightProfileSyncs = new Map<string, Promise<UserProfile>>();
-
 export async function syncUserProfile(
-  firebaseUser: User,
-  overrides?: { displayName?: string; phoneNumber?: string }
-): Promise<UserProfile> {
-  const uid = firebaseUser.uid;
-  const hasOverrides = Boolean(overrides?.displayName || overrides?.phoneNumber);
-  const existingPromise = inFlightProfileSyncs.get(uid);
-
-  if (existingPromise) {
-    if (!hasOverrides) {
-      return existingPromise;
-    }
-    try {
-      await existingPromise;
-    } catch {
-      // Proceed to run a fresh sync with overrides
-    }
-  }
-
-  const syncPromise = syncUserProfileInternal(firebaseUser, overrides).finally(() => {
-    if (inFlightProfileSyncs.get(uid) === syncPromise) {
-      inFlightProfileSyncs.delete(uid);
-    }
-  });
-  inFlightProfileSyncs.set(uid, syncPromise);
-  return syncPromise;
-}
-
-async function syncUserProfileInternal(
   firebaseUser: User,
   overrides?: { displayName?: string; phoneNumber?: string }
 ): Promise<UserProfile> {
@@ -441,14 +411,11 @@ async function syncUserProfileInternal(
     handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
   }
 
-  const derivedPhone = (
+  const derivedPhone =
     overrides?.phoneNumber ||
     (firebaseUser.email?.endsWith(PHONE_EMAIL_DOMAIN)
       ? formatUserContact(firebaseUser.email)
-      : undefined)
-  )
-    ?.trim()
-    .slice(0, 40);
+      : undefined);
 
   if (!snap.exists()) {
     const carriedGuestReads = isVerifiedSuperAdmin
@@ -460,22 +427,16 @@ async function syncUserProfileInternal(
           ])
         ).slice(0, 10);
 
-    const rawName =
+    const resolvedName =
       overrides?.displayName ||
       firebaseUser.displayName ||
       (derivedPhone ? `সদস্য (${derivedPhone})` : firebaseUser.email?.split('@')[0]) ||
       'অতিথি রাঁধুনি';
-    const resolvedName = rawName.trim().slice(0, 100) || 'অতিথি রাঁধুনি';
-    const safeEmail = (firebaseUser.email || '').slice(0, 160);
-    const safePhoto =
-      firebaseUser.photoURL && firebaseUser.photoURL.length <= 160000
-        ? firebaseUser.photoURL
-        : undefined;
 
     const newProfile: Record<string, unknown> = {
       uid: firebaseUser.uid,
       displayName: resolvedName,
-      email: safeEmail,
+      email: firebaseUser.email || '',
       role: isVerifiedSuperAdmin ? 'admin' : 'member',
       subscriptionPlan: isVerifiedSuperAdmin ? 'pro' : 'basic',
       subscriptionStatus: 'active',
@@ -491,8 +452,8 @@ async function syncUserProfileInternal(
     if (derivedPhone) {
       newProfile.phoneNumber = derivedPhone;
     }
-    if (safePhoto) {
-      newProfile.photoURL = safePhoto;
+    if (firebaseUser.photoURL) {
+      newProfile.photoURL = firebaseUser.photoURL;
     }
 
     if (!isVerifiedSuperAdmin) {
@@ -502,35 +463,26 @@ async function syncUserProfileInternal(
 
     try {
       await setDoc(userRef, newProfile);
-      return {
-        uid: firebaseUser.uid,
-        displayName: resolvedName,
-        email: safeEmail,
-        phoneNumber: derivedPhone,
-        photoURL: safePhoto,
-        role: isVerifiedSuperAdmin ? 'admin' : 'member',
-        subscriptionPlan: isVerifiedSuperAdmin ? 'pro' : 'basic',
-        subscriptionStatus: 'active',
-        favoriteRecipeIds: [],
-        unlockedRecipeIds: carriedGuestReads,
-        freeUnlockedRecipeIds: carriedGuestReads,
-        premiumUnlockedRecipeIds: [],
-        premiumRecipeQuota: 0,
-        viewedHistory: [],
-      };
     } catch (error) {
-      // If another tab or concurrent call created the document first, read it instead of failing
-      try {
-        const retrySnap = await getDoc(userRef);
-        if (retrySnap.exists()) {
-          snap = retrySnap;
-        } else {
-          handleFirestoreError(error, OperationType.CREATE, `users/${firebaseUser.uid}`);
-        }
-      } catch {
-        handleFirestoreError(error, OperationType.CREATE, `users/${firebaseUser.uid}`);
-      }
+      handleFirestoreError(error, OperationType.CREATE, `users/${firebaseUser.uid}`);
     }
+
+    return {
+      uid: firebaseUser.uid,
+      displayName: resolvedName,
+      email: newProfile.email as string,
+      phoneNumber: derivedPhone,
+      photoURL: firebaseUser.photoURL || undefined,
+      role: isVerifiedSuperAdmin ? 'admin' : 'member',
+      subscriptionPlan: isVerifiedSuperAdmin ? 'pro' : 'basic',
+      subscriptionStatus: 'active',
+      favoriteRecipeIds: [],
+      unlockedRecipeIds: carriedGuestReads,
+      freeUnlockedRecipeIds: carriedGuestReads,
+      premiumUnlockedRecipeIds: [],
+      premiumRecipeQuota: 0,
+      viewedHistory: [],
+    };
   }
 
   const data = snap.data() as UserProfile;

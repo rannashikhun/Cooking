@@ -62,27 +62,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setLoading(true);
     try {
       const cred = await signInWithPopup(auth, googleProvider);
-      let profile: UserProfile;
-      try {
-        profile = await syncUserProfile(cred.user);
-      } catch {
-        const verifiedAdmin = cred.user.emailVerified && isSuperAdminEmail(cred.user.email);
-        profile = {
-          uid: cred.user.uid,
-          displayName: cred.user.displayName || cred.user.email?.split('@')[0] || 'অতিথি রাঁধুনি',
-          email: cred.user.email || '',
-          photoURL: cred.user.photoURL || undefined,
-          role: verifiedAdmin ? 'admin' : 'member',
-          subscriptionPlan: verifiedAdmin ? 'pro' : 'basic',
-          subscriptionStatus: 'active',
-          favoriteRecipeIds: [],
-          unlockedRecipeIds: [],
-          freeUnlockedRecipeIds: [],
-          premiumUnlockedRecipeIds: [],
-          premiumRecipeQuota: 0,
-          viewedHistory: [],
-        };
-      }
+      const profile = await syncUserProfile(cred.user);
       onProfileSynced?.(profile);
       handleSuccessRedirect(cred.user.email);
     } catch (err: unknown) {

@@ -526,95 +526,75 @@ export default function App() {
         if (profile.role === 'admin' && fbUser.emailVerified) {
           seedInitialDatabaseIfNeeded(false).catch(() => {});
         }
+
+        notifUnsub = onSnapshot(
+          query(
+            collection(db, 'users', fbUser.uid, 'notifications'),
+            orderBy('createdAt', 'desc')
+          ),
+          (snap) => {
+            setNotifications(
+              snap.docs.map((d) => ({
+                id: d.id,
+                ...(d.data() as Omit<UserNotification, 'id'>),
+              }))
+            );
+          },
+          () => {
+            setNotifications([]);
+          }
+        );
+
+        userDocUnsub = onSnapshot(
+          doc(db, 'users', fbUser.uid),
+          (snap) => {
+            if (snap.exists()) {
+              const data = snap.data() as UserProfile;
+              const verifiedAdmin =
+                fbUser.emailVerified &&
+                (isSuperAdminEmail(fbUser.email) || data.role === 'admin');
+              setUser((prev) => {
+                if (
+                  prev?.lastOrderId &&
+                  data.lastOrderId &&
+                  data.lastOrderId !== prev.lastOrderId &&
+                  (data.subscriptionPlan === 'standard' || data.subscriptionPlan === 'pro')
+                ) {
+                  clearUserLocalReads(fbUser.uid);
+                }
+                return {
+                  ...data,
+                  uid: fbUser.uid,
+                  favoriteRecipeIds: Array.isArray(data.favoriteRecipeIds) ? data.favoriteRecipeIds : [],
+                  unlockedRecipeIds: Array.isArray(data.unlockedRecipeIds) ? data.unlockedRecipeIds : [],
+                  freeUnlockedRecipeIds: Array.isArray(data.freeUnlockedRecipeIds)
+                    ? data.freeUnlockedRecipeIds
+                    : prev?.freeUnlockedRecipeIds || [],
+                  premiumUnlockedRecipeIds: Array.isArray(data.premiumUnlockedRecipeIds)
+                    ? data.premiumUnlockedRecipeIds
+                    : prev?.premiumUnlockedRecipeIds || [],
+                  premiumRecipeQuota:
+                    typeof data.premiumRecipeQuota === 'number'
+                      ? data.premiumRecipeQuota
+                      : prev?.premiumRecipeQuota || 0,
+                  viewedHistory: Array.isArray(data.viewedHistory)
+                    ? data.viewedHistory
+                    : prev?.viewedHistory || [],
+                  role:
+                    verifiedAdmin || (fbUser.emailVerified && prev?.role === 'admin')
+                      ? 'admin'
+                      : 'member',
+                };
+              });
+            }
+          },
+          () => {}
+        );
       } catch {
-        setUser((prev) => {
-          if (prev && prev.uid === fbUser.uid) {
-            return prev;
-          }
-          const verifiedAdmin = fbUser.emailVerified && isSuperAdminEmail(fbUser.email);
-          return {
-            uid: fbUser.uid,
-            displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'অতিথি রাঁধুনি',
-            email: fbUser.email || '',
-            photoURL: fbUser.photoURL || undefined,
-            role: verifiedAdmin ? 'admin' : 'member',
-            subscriptionPlan: verifiedAdmin ? 'pro' : 'basic',
-            subscriptionStatus: 'active',
-            favoriteRecipeIds: [],
-            unlockedRecipeIds: [],
-            freeUnlockedRecipeIds: [],
-            premiumUnlockedRecipeIds: [],
-            premiumRecipeQuota: 0,
-            viewedHistory: [],
-          };
-        });
+        setUser(null);
+      } finally {
+        setAuthReady(true);
       }
-
-      notifUnsub = onSnapshot(
-        query(
-          collection(db, 'users', fbUser.uid, 'notifications'),
-          orderBy('createdAt', 'desc')
-        ),
-        (snap) => {
-          setNotifications(
-            snap.docs.map((d) => ({
-              id: d.id,
-              ...(d.data() as Omit<UserNotification, 'id'>),
-            }))
-          );
-        },
-        () => {
-          setNotifications([]);
-        }
-      );
-
-      userDocUnsub = onSnapshot(
-        doc(db, 'users', fbUser.uid),
-        (snap) => {
-          if (snap.exists()) {
-            const data = snap.data() as UserProfile;
-            const verifiedAdmin =
-              fbUser.emailVerified &&
-              (isSuperAdminEmail(fbUser.email) || data.role === 'admin');
-            setUser((prev) => {
-              if (
-                prev?.lastOrderId &&
-                data.lastOrderId &&
-                data.lastOrderId !== prev.lastOrderId &&
-                (data.subscriptionPlan === 'standard' || data.subscriptionPlan === 'pro')
-              ) {
-                clearUserLocalReads(fbUser.uid);
-              }
-              return {
-                ...data,
-                uid: fbUser.uid,
-                favoriteRecipeIds: Array.isArray(data.favoriteRecipeIds) ? data.favoriteRecipeIds : [],
-                unlockedRecipeIds: Array.isArray(data.unlockedRecipeIds) ? data.unlockedRecipeIds : [],
-                freeUnlockedRecipeIds: Array.isArray(data.freeUnlockedRecipeIds)
-                  ? data.freeUnlockedRecipeIds
-                  : prev?.freeUnlockedRecipeIds || [],
-                premiumUnlockedRecipeIds: Array.isArray(data.premiumUnlockedRecipeIds)
-                  ? data.premiumUnlockedRecipeIds
-                  : prev?.premiumUnlockedRecipeIds || [],
-                premiumRecipeQuota:
-                  typeof data.premiumRecipeQuota === 'number'
-                    ? data.premiumRecipeQuota
-                    : prev?.premiumRecipeQuota || 0,
-                viewedHistory: Array.isArray(data.viewedHistory)
-                  ? data.viewedHistory
-                  : prev?.viewedHistory || [],
-                role:
-                  verifiedAdmin || (fbUser.emailVerified && prev?.role === 'admin')
-                    ? 'admin'
-                    : 'member',
-              };
-            });
-          }
-        },
-        () => {}
-      );
-
-      setAuthReady(true);
     });
 
     return () => {
