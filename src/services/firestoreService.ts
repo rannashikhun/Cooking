@@ -388,7 +388,28 @@ export function formatUserContact(email: string, phoneNumber?: string): string {
   return email;
 }
 
+const pendingUserSyncByUid = new Map<string, Promise<unknown>>();
+
 export async function syncUserProfile(
+  firebaseUser: User,
+  overrides?: { displayName?: string; phoneNumber?: string }
+): Promise<UserProfile> {
+  const uid = firebaseUser.uid;
+  const previous = pendingUserSyncByUid.get(uid) || Promise.resolve();
+  const current = previous
+    .catch(() => {})
+    .then(() => syncUserProfileInternal(firebaseUser, overrides));
+  pendingUserSyncByUid.set(uid, current);
+  try {
+    return await current;
+  } finally {
+    if (pendingUserSyncByUid.get(uid) === current) {
+      pendingUserSyncByUid.delete(uid);
+    }
+  }
+}
+
+async function syncUserProfileInternal(
   firebaseUser: User,
   overrides?: { displayName?: string; phoneNumber?: string }
 ): Promise<UserProfile> {

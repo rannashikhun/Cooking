@@ -36,7 +36,7 @@ interface HeaderProps {
   activeTab: ActiveTab;
   onNavigate: (tab: ActiveTab) => void;
   user: UserProfile | null;
-  onOpenAuth: () => void;
+  onOpenAuth: (returnTab?: 'profile') => void;
   onLogout: () => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
@@ -348,7 +348,7 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <button
                 type="button"
-                onClick={onOpenAuth}
+                onClick={() => onOpenAuth()}
                 className={`text-[14px] font-semibold py-1.5 px-4 rounded-full border transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === 'login'
                     ? 'border-[#B92B27] bg-[#FDF5F3] text-[#B92B27]'
@@ -423,7 +423,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               type="button"
-              onClick={() => (user ? onNavigate('profile') : onOpenAuth())}
+              onClick={() => (user ? onNavigate('profile') : onOpenAuth('profile'))}
               aria-label="প্রোফাইল"
               className="min-w-[40px] min-h-[44px] flex items-center justify-center text-[#1A1A1A] rounded-lg active:bg-gray-100 active:scale-92 transition-transform duration-150"
             >

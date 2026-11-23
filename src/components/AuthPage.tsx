@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
@@ -41,8 +41,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [needsConsoleEnable, setNeedsConsoleEnable] = useState(false);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleSuccessRedirect = (userEmail?: string | null) => {
+    if (!isMountedRef.current) return;
     if (onAuthSuccess) onAuthSuccess();
     if (pendingPlan) {
       onNavigate({ page: 'checkout', planId: pendingPlan.id });

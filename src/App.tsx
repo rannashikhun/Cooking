@@ -591,7 +591,7 @@ export default function App() {
           () => {}
         );
       } catch {
-        setUser(null);
+        setUser((prev) => (prev && prev.uid === fbUser.uid ? prev : null));
       } finally {
         setAuthReady(true);
       }
@@ -750,6 +750,20 @@ export default function App() {
     };
   }, [user, showToast]);
 
+  // Safety net: if user finishes signing in while on /login, redirect straight to their destination
+  useEffect(() => {
+    if (route.page !== 'login' || !authReady || !user) return;
+    const target: PageRoute = pendingCheckoutPlanId
+      ? { page: 'checkout', planId: pendingCheckoutPlanId }
+      : authReturnRoute && authReturnRoute.page !== 'login'
+        ? authReturnRoute
+        : isSuperAdminEmail(user.email)
+          ? { page: 'admin' }
+          : { page: 'profile' };
+    navigate(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.page, authReady, user?.uid]);
+
   const hasActivePremiumAccess = isPaidPlanActive(user);
 
   const isAdminUser = user?.role === 'admin';
@@ -827,9 +841,11 @@ export default function App() {
         activeTab={activeTab}
         onNavigate={navigateTab}
         user={user}
-        onOpenAuth={() => {
-          setPendingCheckoutPlanId(null);
-          navigate({ page: 'login' });
+        onOpenAuth={(returnTab) => {
+          navigate(
+            { page: 'login' },
+            returnTab ? { returnRoute: { page: returnTab } } : undefined
+          );
         }}
         onLogout={handleLogout}
         searchQuery={searchQuery}
@@ -1225,7 +1241,11 @@ export default function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
               onLogout={handleLogout}
-              onNavigate={navigate}
+              onNavigate={(next) =>
+                next.page === 'login'
+                  ? navigate({ page: 'login' }, { returnRoute: { page: 'profile' } })
+                  : navigate(next)
+              }
               onPhotoUpdated={(photoURL) =>
                 setUser((prev) => (prev ? { ...prev, photoURL } : prev))
               }
@@ -1243,7 +1263,11 @@ export default function App() {
             <EditProfilePage
               user={user}
               siteSettings={siteSettings}
-              onNavigate={navigate}
+              onNavigate={(next) =>
+                next.page === 'login'
+                  ? navigate({ page: 'login' }, { returnRoute: { page: 'edit-profile' } })
+                  : navigate(next)
+              }
               onProfileUpdated={(patch) =>
                 setUser((prev) => (prev ? { ...prev, ...patch } : prev))
               }
