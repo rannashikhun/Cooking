@@ -1491,6 +1491,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       contactPhone: ((sPhone || '').trim() || siteSettings.contactPhone || '').slice(0, 40),
       contactAddress: ((sAddress || '').trim() || siteSettings.contactAddress || '').slice(0, 200),
       footerNote: (sFooter || '').trim().slice(0, 240),
+      adminPhotoUrl: (siteSettings.adminPhotoUrl || (isFullAdmin ? currentUser.photoURL : '') || '').slice(0, 160000),
+      adminDisplayName: (siteSettings.adminDisplayName || (isFullAdmin ? currentUser.displayName : '') || '').slice(0, 100),
       ...overrides,
     };
   };
@@ -2562,6 +2564,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </span>
                           {(() => {
                             const groupOnline = isUserOnlineNow(group.userProfile, nowMs);
+                            const groupPresenceText = formatRelativePresenceBn(group.userProfile, nowMs);
                             const openGroupMember = () => {
                               const resolvedMember: UserProfile = group.userProfile || {
                                 uid: group.orders[0]?.userId || group.key,
@@ -2606,7 +2609,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     </div>
                                   )}
                                   <span
-                                    title={groupOnline ? 'অনলাইন' : 'অফলাইন'}
+                                    title={groupPresenceText}
                                     className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
                                       groupOnline ? 'bg-emerald-500' : 'bg-gray-400'
                                     }`}
@@ -2636,6 +2639,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                       />
                                       {groupOnline ? 'অনলাইন' : 'অফলাইন'}
                                     </span>
+                                    {!groupOnline && groupPresenceText !== 'অ্যাক্টিভিটি নেই' && (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-600 font-numeral-bn">
+                                        <Clock className="w-3 h-3 text-gray-400 shrink-0" />
+                                        {groupPresenceText}
+                                      </span>
+                                    )}
                                     {group.orders.length > 1 && (
                                       <span className="px-2 py-0.5 rounded-md bg-white/90 border border-black/10 text-[#1A1A1A] text-[11px] font-bold font-numeral-bn tabular-nums">
                                         {toBengaliDigits(group.orders.length)} বার প্ল্যান আপগ্রেড
@@ -4741,8 +4750,14 @@ const UserControlRow: React.FC<{
                 </button>
               )}
             </div>
-            <p className="text-xs text-gray-500 truncate max-w-[220px]">
+            <p className="text-xs text-gray-500 truncate max-w-[230px]">
               {formatUserContact(user.email, user.phoneNumber)}
+            </p>
+            <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-numeral-bn text-gray-500">
+              <Clock className="w-3 h-3 text-gray-400 shrink-0" />
+              <span className={online ? 'text-emerald-700 font-semibold' : 'text-gray-500'}>
+                {presenceTooltip}
+              </span>
             </p>
           </div>
         </div>

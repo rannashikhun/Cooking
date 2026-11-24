@@ -187,6 +187,8 @@ function routePathForCanonical(route: PageRoute): string {
       return '/profile';
     case 'edit-profile':
       return '/profile/edit';
+    case 'notifications':
+      return route.tab === 'messages' ? '/messages' : '/notifications';
     case 'admin':
       return '/admin';
   }
@@ -346,6 +348,10 @@ export function applyRouteSeoMeta(params: {
   } else if (route.page === 'contact') {
     title = `যোগাযোগ — ${siteName}`;
     ogTitle = title;
+  } else if (route.page === 'notifications') {
+    title = `${route.tab === 'messages' ? 'মেসেজ' : 'নোটিফিকেশন'} — ${siteName}`;
+    ogTitle = title;
+    pageRobots = 'noindex, nofollow';
   } else if (
     route.page === 'admin' ||
     route.page === 'profile' ||

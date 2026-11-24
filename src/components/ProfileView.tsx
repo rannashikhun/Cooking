@@ -4,10 +4,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Timestamp, collection, onSnapshot, query, where } from 'firebase/firestore';
 import {
   AlertTriangle,
-  Bell,
   BookOpen,
   Camera,
-  CheckCheck,
   CheckCircle2,
   Clock,
   Crown,
@@ -18,17 +16,13 @@ import {
   LogOut,
   Mail,
   MapPin,
-  MessageCircle,
-  MessageSquare,
   Pencil,
   Phone,
   ShieldCheck,
   User as UserIcon,
   X,
-  XCircle,
 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { UserAdminChatPanel } from './UserAdminChatPanel';
 import {
   FREE_RECIPE_LIMIT,
   formatUserContact,
@@ -48,7 +42,6 @@ import type {
   SiteSettings,
   SubscriptionOrder,
   SubscriptionPlan,
-  UserNotification,
   UserProfile,
 } from '../types';
 
@@ -57,12 +50,6 @@ interface ProfileViewProps {
   recipes: Recipe[];
   plans?: SubscriptionPlan[];
   siteSettings?: SiteSettings;
-  notifications?: UserNotification[];
-  unreadDirectMessagesCount?: number;
-  initialNotifTab?: 'notifications' | 'messages';
-  initialNotifTabNonce?: number;
-  onNotificationClick?: (notif: UserNotification) => void;
-  onMarkAllNotificationsRead?: () => void;
   onLogout: () => void;
   onNavigate: (route: PageRoute) => void;
   onPhotoUpdated?: (photoURL: string) => void;
@@ -183,12 +170,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   recipes,
   plans = [],
   siteSettings,
-  notifications = [],
-  unreadDirectMessagesCount = 0,
-  initialNotifTab = 'notifications',
-  initialNotifTabNonce = 0,
-  onNotificationClick,
-  onMarkAllNotificationsRead,
   onLogout,
   onNavigate,
   onPhotoUpdated,
@@ -202,7 +183,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   const [orders, setOrders] = useState<SubscriptionOrder[]>([]);
   const [activeRecipeTab, setActiveRecipeTab] = useState<'free' | 'premium' | 'favorites'>('free');
-  const [commsTab, setCommsTab] = useState<'notifications' | 'messages'>(initialNotifTab);
   const [preparingPhoto, setPreparingPhoto] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null);
@@ -211,17 +191,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const commsCardRef = useRef<HTMLDivElement>(null);
   const photoInputId = 'profile-view-photo-input';
-
-  useEffect(() => {
-    setCommsTab(initialNotifTab);
-    if (initialNotifTabNonce > 0 && initialNotifTab === 'messages') {
-      window.setTimeout(() => {
-        commsCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 120);
-    }
-  }, [initialNotifTab, initialNotifTabNonce]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -387,7 +357,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     })
     .filter((item): item is { recipe: Recipe; viewedAt: number | undefined } => item !== null);
 
-  const unreadNotifCount = notifications.filter((n) => !n.isRead).length;
   const { daysLeft, hoursLeft, isExpiringSoon, isExpired, expiresDateLabel } =
     getRemainingSubscriptionDays(user);
   const displayContact = formatUserContact(user.email, user.phoneNumber);
@@ -578,169 +547,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         {photoErr && (
           <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
             {photoErr}
-          </div>
-        )}
-      </div>
-
-      {/* User Notifications & Direct Admin Messages */}
-      <div
-        ref={commsCardRef}
-        className="bg-white rounded-3xl border border-gray-200 p-5 sm:p-7 space-y-4"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-1.5 p-1 rounded-2xl bg-[#F4F5F2] border border-gray-200/80">
-            <button
-              type="button"
-              onClick={() => setCommsTab('notifications')}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold cursor-pointer transition-all ${
-                commsTab === 'notifications'
-                  ? 'bg-[#1B4D24] text-white shadow-xs'
-                  : 'text-gray-700 hover:bg-white/80'
-              }`}
-            >
-              <Bell className="w-4 h-4 shrink-0" />
-              <span>নোটিফিকেশন ({toBengaliDigits(notifications.length)})</span>
-              {unreadNotifCount > 0 && (
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold tabular-nums ${
-                    commsTab === 'notifications'
-                      ? 'bg-white/20 text-white'
-                      : 'bg-[#B92B27] text-white'
-                  }`}
-                >
-                  {toBengaliDigits(unreadNotifCount)} নতুন
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setCommsTab('messages')}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold cursor-pointer transition-all ${
-                commsTab === 'messages'
-                  ? 'bg-[#1B4D24] text-white shadow-xs'
-                  : 'text-gray-700 hover:bg-white/80'
-              }`}
-            >
-              <MessageCircle className="w-4 h-4 shrink-0" />
-              <span>মেসেজ</span>
-              {unreadDirectMessagesCount > 0 && (
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold tabular-nums ${
-                    commsTab === 'messages'
-                      ? 'bg-white/20 text-white'
-                      : 'bg-[#B92B27] text-white'
-                  }`}
-                >
-                  {toBengaliDigits(unreadDirectMessagesCount)} নতুন
-                </span>
-              )}
-            </button>
-          </div>
-
-          {commsTab === 'notifications' && unreadNotifCount > 0 && onMarkAllNotificationsRead && (
-            <button
-              type="button"
-              onClick={onMarkAllNotificationsRead}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1B4D24] hover:underline cursor-pointer"
-            >
-              <CheckCheck className="w-4 h-4" />
-              সব পড়া হয়েছে চিহ্নিত করুন
-            </button>
-          )}
-        </div>
-
-        {commsTab === 'messages' ? (
-          <UserAdminChatPanel
-            user={user}
-            siteName={siteSettings?.siteName}
-            adminContactEmail={siteSettings?.contactEmail}
-          />
-        ) : notifications.length === 0 ? (
-          <p className="text-sm text-gray-500 py-3">
-            এখনো কোনো নোটিফিকেশন নেই। আপনার মন্তব্যের রিপ্লাই, পেমেন্ট আপডেট বা এডমিনের মেসেজের নোটিফিকেশন এখানে পাবেন।
-          </p>
-        ) : (
-          <div className="space-y-2.5">
-            {notifications.map((n) => (
-              <button
-                key={n.id}
-                type="button"
-                onClick={() => {
-                  if (n.type === 'admin_message') {
-                    onNotificationClick?.(n);
-                    setCommsTab('messages');
-                    return;
-                  }
-                  onNotificationClick?.(n);
-                }}
-                className={`w-full text-left p-3.5 rounded-2xl border flex items-start gap-3 transition-colors cursor-pointer ${
-                  n.isRead
-                    ? 'bg-[#FAFAF8] border-gray-100 hover:border-gray-300'
-                    : 'bg-[#F2F8F3] border-[#1B4D24]/30 hover:border-[#1B4D24]/50'
-                }`}
-              >
-                <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                    n.type === 'admin_message'
-                      ? 'bg-[#1B4D24] text-white'
-                      : n.type === 'comment_reply'
-                        ? 'bg-[#1B4D24]/12 text-[#1B4D24]'
-                        : n.type === 'payment_approved'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : n.type === 'payment_rejected' || n.type === 'free_limit_reached'
-                            ? 'bg-red-100 text-red-600'
-                            : n.type === 'pro_limit_reached'
-                              ? 'bg-amber-100 text-[#9A6E04]'
-                              : n.type === 'plan_expiry_reminder'
-                                ? 'bg-orange-100 text-orange-700'
-                                : 'bg-amber-100 text-amber-700'
-                  }`}
-                >
-                  {n.type === 'admin_message' ? (
-                    <MessageCircle className="w-4 h-4" />
-                  ) : n.type === 'comment_reply' ? (
-                    <MessageSquare className="w-4 h-4" />
-                  ) : n.type === 'payment_approved' ? (
-                    <CheckCircle2 className="w-4 h-4" />
-                  ) : n.type === 'payment_rejected' ? (
-                    <XCircle className="w-4 h-4" />
-                  ) : n.type === 'free_limit_reached' || n.type === 'plan_expiry_reminder' ? (
-                    <AlertTriangle className="w-4 h-4" />
-                  ) : n.type === 'pro_limit_reached' ? (
-                    <Crown className="w-4 h-4" />
-                  ) : (
-                    <Clock className="w-4 h-4" />
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-bold text-[#1A1A1A]">{n.title}</p>
-                    <span className="text-[11px] text-gray-500">
-                      {formatTimestampBn(n.createdAt)}
-                    </span>
-                  </div>
-                  <p className="text-xs sm:text-sm text-gray-700 mt-1 leading-relaxed">
-                    {n.message}
-                  </p>
-                  {n.type === 'admin_message' ? (
-                    <p className="text-xs font-bold text-[#1B4D24] mt-1">
-                      মেসেজ ট্যাবে উত্তর দিন →
-                    </p>
-                  ) : n.recipeId ? (
-                    <p className="text-xs font-bold text-[#1B4D24] mt-1">
-                      রেসিপি পোস্টে যান →
-                    </p>
-                  ) : n.type === 'free_limit_reached' ||
-                    n.type === 'pro_limit_reached' ||
-                    n.type === 'plan_expiry_reminder' ? (
-                    <p className="text-xs font-bold text-[#B92B27] mt-1">
-                      প্ল্যান দেখুন / রিনিউ করুন →
-                    </p>
-                  ) : null}
-                </div>
-              </button>
-            ))}
           </div>
         )}
       </div>

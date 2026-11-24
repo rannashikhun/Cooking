@@ -435,7 +435,8 @@ service cloud.firestore {
           'bingSiteVerification', 'googleAnalyticsId', 'robotsTxtExtra',
           'socialShareImageUrl', 'socialShareTitle', 'socialShareDescription',
           'socialShareImageAlt', 'twitterHandle', 'fbAppId', 'showRecipeShareButton',
-          'contactEmail', 'contactPhone', 'contactAddress', 'footerNote', 'updatedAt'
+          'contactEmail', 'contactPhone', 'contactAddress', 'footerNote',
+          'adminPhotoUrl', 'adminDisplayName', 'updatedAt'
         ]) &&
         data.siteName is string && data.siteName.size() >= 1 && data.siteName.size() <= 80 &&
         isStrMax(data.tagline, 240) &&
@@ -450,6 +451,8 @@ service cloud.firestore {
         isStrMax(data.contactPhone, 60) &&
         isStrMax(data.contactAddress, 240) &&
         isStrMax(data.get('footerNote', ''), 320) &&
+        isStrMax(data.get('adminPhotoUrl', ''), 160000) &&
+        isStrMax(data.get('adminDisplayName', ''), 100) &&
         data.updatedAt is timestamp;
     }
 

@@ -56,7 +56,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     if (onAuthSuccess) onAuthSuccess();
     if (pendingPlan) {
       onNavigate({ page: 'checkout', planId: pendingPlan.id });
-    } else if (returnRoute && returnRoute.page !== 'login') {
+    } else if (returnRoute && returnRoute.page !== 'login' && returnRoute.page !== 'home') {
       onNavigate(returnRoute);
     } else if (isSuperAdminEmail(userEmail) || isBootstrappedModeratorEmail(userEmail)) {
       onNavigate({ page: 'admin' });
@@ -343,7 +343,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   : 'লগইন করুন'
                 : pendingPlan
                   ? 'অ্যাকাউন্ট তৈরি করে পেমেন্ট পেজে যান'
-                  : returnRoute && returnRoute.page !== 'profile'
+                  : returnRoute && returnRoute.page !== 'profile' && returnRoute.page !== 'home'
                     ? 'অ্যাকাউন্ট তৈরি করুন'
                     : 'অ্যাকাউন্ট তৈরি করুন ও প্রোফাইলে যান'}
           </button>

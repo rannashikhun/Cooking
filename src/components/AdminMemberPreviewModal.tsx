@@ -151,7 +151,7 @@ export const AdminMemberPreviewModal: React.FC<AdminMemberPreviewModalProps> = (
         text: clean,
       });
       setDraft('');
-      setSendFeedback('মেসেজ পাঠানো হয়েছে এবং সদস্যের কাছে নোটিফিকেশন পৌঁছে গেছে।');
+      setSendFeedback('মেসেজ পাঠানো হয়েছে এবং সদস্যের মেসেজ অপশনে পৌঁছে গেছে।');
       onMessageSent?.(member.displayName || 'সদস্য');
       setTimeout(() => setSendFeedback(null), 3500);
     } catch {
@@ -334,7 +334,7 @@ export const AdminMemberPreviewModal: React.FC<AdminMemberPreviewModalProps> = (
                 </p>
               </div>
               <span className="text-[11px] text-gray-500">
-                মেসেজ পাঠালে ইউজার নোটিফিকেশন ও মেসেজ ট্যাবে পাবে
+                মেসেজ পাঠালে ইউজারের মেসেজ অপশনে চলে যাবে
               </span>
             </div>
 
@@ -353,7 +353,7 @@ export const AdminMemberPreviewModal: React.FC<AdminMemberPreviewModalProps> = (
                     এখনো কোনো মেসেজ আদান-প্রদান হয়নি
                   </p>
                   <p className="text-[11px] text-gray-500">
-                    নিচে মেসেজ লিখে পাঠালে {member.displayName}-এর নোটিফিকেশন ও মেসেজ ট্যাবে চলে যাবে।
+                    নিচে মেসেজ লিখে পাঠালে {member.displayName}-এর মেসেজ অপশনে চলে যাবে।
                   </p>
                 </div>
               ) : (

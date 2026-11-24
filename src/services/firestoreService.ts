@@ -2224,6 +2224,23 @@ export async function saveSiteSettingsAdmin(settings: Omit<SiteSettings, 'update
   }
 }
 
+export async function syncAdminPublicAvatar(adminUser: {
+  displayName?: string;
+  photoURL?: string;
+}): Promise<void> {
+  try {
+    const cleanPhoto = (adminUser.photoURL || '').trim().slice(0, 160000);
+    const cleanName = (adminUser.displayName || '').trim().slice(0, 100);
+    await updateDoc(doc(db, 'siteSettings', 'main'), {
+      adminPhotoUrl: cleanPhoto,
+      adminDisplayName: cleanName,
+      updatedAt: serverTimestamp(),
+    });
+  } catch {
+    // Silent: if siteSettings/main does not exist yet or user lacks verified admin claim
+  }
+}
+
 export async function submitContactMessage(msg: Omit<ContactMessage, 'id' | 'status' | 'createdAt'>): Promise<void> {
   const id = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   try {
@@ -2274,21 +2291,26 @@ export function formatRelativePresenceBn(
   user: Pick<UserProfile, 'isOnline' | 'lastActiveAt'> | null | undefined,
   nowMs: number = Date.now()
 ): string {
-  if (isUserOnlineNow(user, nowMs)) return 'এখন অনলাইন';
+  if (isUserOnlineNow(user, nowMs)) return 'এখন অ্যাক্টিভ';
   const lastMs = getSubscriptionExpiresMillis(user?.lastActiveAt);
-  if (!lastMs) return 'অফলাইন';
+  if (!lastMs) return 'অ্যাক্টিভিটি নেই';
 
   const toBn = (n: number) =>
     String(n).replace(/\d/g, (d) => ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'][Number(d)]);
 
   const diffSec = Math.max(0, Math.floor((nowMs - lastMs) / 1000));
-  if (diffSec < 60) return 'এইমাত্র অফলাইন';
+  if (diffSec < 60) return '১ মিনিট আগে অ্যাক্টিভ';
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${toBn(diffMin)} মিনিট আগে সক্রিয়`;
+  if (diffMin < 60) return `${toBn(diffMin)} মিনিট আগে অ্যাক্টিভ`;
   const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${toBn(diffHr)} ঘণ্টা আগে সক্রিয়`;
+  const remMin = diffMin % 60;
+  if (diffHr < 24) {
+    return remMin > 0
+      ? `${toBn(diffHr)} ঘণ্টা ${toBn(remMin)} মিনিট আগে অ্যাক্টিভ`
+      : `${toBn(diffHr)} ঘণ্টা আগে অ্যাক্টিভ`;
+  }
   const diffDay = Math.floor(diffHr / 24);
-  if (diffDay <= 30) return `${toBn(diffDay)} দিন আগে সক্রিয়`;
+  if (diffDay <= 30) return `${toBn(diffDay)} দিন আগে অ্যাক্টিভ`;
   return new Date(lastMs).toLocaleDateString('bn-BD', {
     day: 'numeric',
     month: 'short',
@@ -2436,7 +2458,6 @@ export async function sendDirectMessageAsAdmin(params: {
 
   const targetUid = params.targetUser.uid;
   const msgId = `dm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-  const notifId = `ntf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const threadRef = doc(db, 'directThreads', targetUid);
 
   try {
@@ -2468,7 +2489,6 @@ export async function sendDirectMessageAsAdmin(params: {
     }
 
     const senderName = (params.adminUser.displayName || 'এডমিন').slice(0, 100);
-    const notifPreview = cleanText.length > 180 ? `${cleanText.slice(0, 177)}...` : cleanText;
 
     const batch = writeBatch(db);
     batch.set(doc(db, 'directThreads', targetUid, 'messages', msgId), {
@@ -2479,15 +2499,6 @@ export async function sendDirectMessageAsAdmin(params: {
       createdAt: serverTimestamp(),
     });
     batch.set(threadRef, threadPayload);
-    batch.set(doc(db, 'users', targetUid, 'notifications', notifId), {
-      type: 'admin_message',
-      title: 'এডমিন থেকে নতুন মেসেজ এসেছে',
-      message: notifPreview,
-      senderUid: params.adminUser.uid,
-      senderName,
-      isRead: false,
-      createdAt: serverTimestamp(),
-    });
     await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `directThreads/${targetUid}/messages/${msgId}`);

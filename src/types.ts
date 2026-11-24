@@ -21,6 +21,7 @@ export type PageRoute =
   | { page: 'login' }
   | { page: 'profile' }
   | { page: 'edit-profile' }
+  | { page: 'notifications'; tab?: 'notifications' | 'messages' }
   | { page: 'admin' };
 
 export type ActiveTab =
@@ -33,6 +34,7 @@ export type ActiveTab =
   | 'favorites'
   | 'login'
   | 'profile'
+  | 'notifications'
   | 'admin';
 
 export interface Recipe {
@@ -326,6 +328,8 @@ export interface SiteSettings {
   contactPhone: string;
   contactAddress: string;
   footerNote?: string;
+  adminPhotoUrl?: string;
+  adminDisplayName?: string;
   updatedAt?: unknown;
 }
 

@@ -23,6 +23,7 @@ import {
 import { Timestamp } from 'firebase/firestore';
 import { BrandMark } from './BrandMark';
 import { CategoryIcon } from './CategoryIcon';
+import { AdminMessengerPanel } from './AdminMessengerPanel';
 import { UserAdminChatPanel } from './UserAdminChatPanel';
 import {
   FREE_RECIPE_LIMIT,
@@ -47,9 +48,11 @@ interface HeaderProps {
   notifications?: UserNotification[];
   unreadDirectMessagesCount?: number;
   adminContactEmail?: string;
+  adminPhotoUrl?: string;
+  adminDisplayName?: string;
   onNotificationClick?: (notif: UserNotification) => void;
   onMarkAllNotificationsRead?: () => void;
-  onOpenProfileMessages?: () => void;
+  onOpenNotificationsPage?: (tab: 'notifications' | 'messages') => void;
   categories?: RecipeCategory[];
   recipes?: Recipe[];
   selectedCategory?: string;
@@ -119,9 +122,11 @@ export const Header: React.FC<HeaderProps> = ({
   notifications = [],
   unreadDirectMessagesCount = 0,
   adminContactEmail,
+  adminPhotoUrl,
+  adminDisplayName,
   onNotificationClick,
   onMarkAllNotificationsRead,
-  onOpenProfileMessages,
+  onOpenNotificationsPage,
   categories = [],
   recipes = [],
   selectedCategory = 'সব',
@@ -174,6 +179,8 @@ export const Header: React.FC<HeaderProps> = ({
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifPanelTab, setNotifPanelTab] = useState<'notifications' | 'messages'>('notifications');
   const notifContainerRef = useRef<HTMLDivElement>(null);
+  const desktopBellBtnRef = useRef<HTMLButtonElement>(null);
+  const mobileBellBtnRef = useRef<HTMLButtonElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -182,7 +189,14 @@ export const Header: React.FC<HeaderProps> = ({
   useEffect(() => {
     if (!notifOpen) return;
     const handleOutside = (e: MouseEvent) => {
-      if (notifContainerRef.current && !notifContainerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        desktopBellBtnRef.current?.contains(target) ||
+        mobileBellBtnRef.current?.contains(target)
+      ) {
+        return;
+      }
+      if (notifContainerRef.current && !notifContainerRef.current.contains(target)) {
         setNotifOpen(false);
       }
     };
@@ -314,11 +328,13 @@ export const Header: React.FC<HeaderProps> = ({
 
             {user && (
               <button
+                ref={desktopBellBtnRef}
                 type="button"
                 onClick={() => setNotifOpen((prev) => !prev)}
                 aria-label="নোটিফিকেশন"
+                aria-expanded={notifOpen}
                 className={`relative w-9 h-9 rounded-full border flex items-center justify-center transition-colors cursor-pointer ${
-                  notifOpen
+                  notifOpen || activeTab === 'notifications'
                     ? 'border-[#1B4D24] bg-[#1B4D24]/10 text-[#1B4D24]'
                     : 'border-gray-200 hover:border-gray-300 bg-white text-[#1A1A1A]'
                 }`}
@@ -412,14 +428,18 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-0.5">
             {user && (
               <button
+                ref={mobileBellBtnRef}
                 type="button"
                 onClick={() => {
                   setMobileSearchOpen(false);
                   setNotifOpen((prev) => !prev);
                 }}
                 aria-label="নোটিফিকেশন"
+                aria-expanded={notifOpen}
                 className={`relative min-w-[40px] min-h-[44px] flex items-center justify-center rounded-lg active:bg-gray-100 active:scale-92 transition-all duration-150 ${
-                  notifOpen ? 'text-[#1B4D24] bg-[#1B4D24]/8' : 'text-[#1A1A1A]'
+                  notifOpen || activeTab === 'notifications'
+                    ? 'text-[#1B4D24] bg-[#1B4D24]/8'
+                    : 'text-[#1A1A1A]'
                 }`}
               >
                 <Bell className="w-5 h-5" />
@@ -541,26 +561,36 @@ export const Header: React.FC<HeaderProps> = ({
 
             {notifPanelTab === 'messages' ? (
               <>
-                <UserAdminChatPanel
-                  user={user}
-                  siteName={siteName}
-                  adminContactEmail={adminContactEmail}
-                  compact
-                />
+                {user.role === 'admin' ? (
+                  <AdminMessengerPanel
+                    adminUser={user}
+                    siteName={siteName}
+                    compact
+                  />
+                ) : (
+                  <UserAdminChatPanel
+                    user={user}
+                    siteName={siteName}
+                    adminContactEmail={adminContactEmail}
+                    adminPhotoUrl={adminPhotoUrl}
+                    adminDisplayName={adminDisplayName}
+                    compact
+                  />
+                )}
                 <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 text-center">
                   <button
                     type="button"
                     onClick={() => {
                       setNotifOpen(false);
-                      if (onOpenProfileMessages) {
-                        onOpenProfileMessages();
+                      if (onOpenNotificationsPage) {
+                        onOpenNotificationsPage('messages');
                       } else {
-                        onNavigate('profile');
+                        onNavigate('notifications');
                       }
                     }}
                     className="text-xs font-bold text-[#1B4D24] hover:underline cursor-pointer"
                   >
-                    প্রোফাইলে বড় স্ক্রিনে মেসেজ দেখুন →
+                    বড় স্ক্রিনে সকল মেসেজ দেখুন →
                   </button>
                 </div>
               </>
@@ -569,10 +599,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
                   {notifications.length === 0 ? (
                     <div className="p-6 text-center text-xs text-gray-500">
-                      এখনো কোনো নোটিফিকেশন নেই। আপনার মন্তব্যের রিপ্লাই, পেমেন্ট আপডেট বা এডমিনের বার্তা এখানে দেখা যাবে।
+                      এখনো কোনো নোটিফিকেশন নেই। আপনার মন্তব্যের উত্তর, পেমেন্ট আপডেট বা মেয়াদ রিমাইন্ডার এখানে দেখা যাবে।
                     </div>
                   ) : (
-                    notifications.slice(0, 10).map((n) => (
+                    notifications.slice(0, 3).map((n) => (
                       <button
                         key={n.id}
                         type="button"
@@ -644,11 +674,15 @@ export const Header: React.FC<HeaderProps> = ({
                     type="button"
                     onClick={() => {
                       setNotifOpen(false);
-                      onNavigate('profile');
+                      if (onOpenNotificationsPage) {
+                        onOpenNotificationsPage('notifications');
+                      } else {
+                        onNavigate('notifications');
+                      }
                     }}
                     className="text-xs font-bold text-[#1B4D24] hover:underline cursor-pointer"
                   >
-                    প্রোফাইলে সকল নোটিফিকেশন দেখুন →
+                    সকল নোটিফিকেশন দেখুন →
                   </button>
                 </div>
               </>

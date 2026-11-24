@@ -12,6 +12,7 @@ import { EditProfilePage } from './components/EditProfilePage';
 import { Header } from './components/Header';
 import { HeroCarousel } from './components/HeroCarousel';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { NotificationsMessagesPage } from './components/NotificationsMessagesPage';
 import { PricingSection } from './components/PricingSection';
 import { ProfileView } from './components/ProfileView';
 import { RecipeDetailPage } from './components/RecipeDetailPage';
@@ -53,6 +54,7 @@ import {
   sortByNewestCreatedAt,
   sortByOrderIndexAsc,
   sortRecipesNewestFirst,
+  syncAdminPublicAvatar,
   syncUserProfile,
   toggleFavoriteRecipe,
   updateUserPresence,
@@ -101,6 +103,8 @@ function parsePathToRoute(pathname: string): PageRoute {
   if (clean === '/login') return { page: 'login' };
   if (clean === '/profile') return { page: 'profile' };
   if (clean === '/profile/edit') return { page: 'edit-profile' };
+  if (clean === '/notifications') return { page: 'notifications', tab: 'notifications' };
+  if (clean === '/messages') return { page: 'notifications', tab: 'messages' };
   if (clean === '/admin') return { page: 'admin' };
   return { page: 'home' };
 }
@@ -137,6 +141,8 @@ function routeToPath(route: PageRoute): string {
       return '/profile';
     case 'edit-profile':
       return '/profile/edit';
+    case 'notifications':
+      return route.tab === 'messages' ? '/messages' : '/notifications';
     case 'admin':
       return '/admin';
   }
@@ -168,6 +174,8 @@ function routeToActiveTab(route: PageRoute): ActiveTab {
     case 'profile':
     case 'edit-profile':
       return 'profile';
+    case 'notifications':
+      return 'notifications';
     case 'admin':
       return 'admin';
   }
@@ -181,6 +189,7 @@ const DETAIL_ROUTE_PAGES = new Set<PageRoute['page']>([
   'tip-detail',
   'blog-detail',
   'edit-profile',
+  'notifications',
   'checkout',
 ]);
 
@@ -219,7 +228,12 @@ export default function App() {
       const raw = sessionStorage.getItem('rs_auth_return_route');
       if (!raw) return null;
       const parsed = JSON.parse(raw) as PageRoute;
-      return parsed && typeof parsed.page === 'string' && parsed.page !== 'login' ? parsed : null;
+      return parsed &&
+        typeof parsed.page === 'string' &&
+        parsed.page !== 'login' &&
+        parsed.page !== 'home'
+        ? parsed
+        : null;
     } catch {
       return null;
     }
@@ -236,8 +250,6 @@ export default function App() {
   });
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [unreadDirectMessagesCount, setUnreadDirectMessagesCount] = useState<number>(0);
-  const [profileNotifTab, setProfileNotifTab] = useState<'notifications' | 'messages'>('notifications');
-  const [profileNotifTabNonce, setProfileNotifTabNonce] = useState<number>(0);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
 
@@ -404,19 +416,28 @@ export default function App() {
     }
   };
 
-  const navigate = (nextRoute: PageRoute, options?: { returnRoute?: PageRoute }) => {
+  const navigate = (
+    nextRoute: PageRoute,
+    options?: { returnRoute?: PageRoute; clearReturnRoute?: boolean }
+  ) => {
     if (nextRoute.page === 'recipe-detail') {
       recordRecipeInterestSignal(user?.uid, nextRoute.id);
       setInterestVersion((v) => v + 1);
     }
     if (nextRoute.page === 'login') {
-      const resolvedReturn =
-        options?.returnRoute && options.returnRoute.page !== 'login'
-          ? options.returnRoute
-          : route.page !== 'login'
-            ? route
-            : authReturnRoute;
-      persistAuthReturnRoute(resolvedReturn);
+      if (options?.clearReturnRoute) {
+        persistAuthReturnRoute(null);
+      } else {
+        const resolvedReturn =
+          options?.returnRoute &&
+          options.returnRoute.page !== 'login' &&
+          options.returnRoute.page !== 'home'
+            ? options.returnRoute
+            : route.page !== 'login' && route.page !== 'home'
+              ? route
+              : authReturnRoute;
+        persistAuthReturnRoute(resolvedReturn);
+      }
     } else {
       persistAuthReturnRoute(null);
     }
@@ -546,10 +567,12 @@ export default function App() {
           ),
           (snap) => {
             setNotifications(
-              snap.docs.map((d) => ({
-                id: d.id,
-                ...(d.data() as Omit<UserNotification, 'id'>),
-              }))
+              snap.docs
+                .map((d) => ({
+                  id: d.id,
+                  ...(d.data() as Omit<UserNotification, 'id'>),
+                }))
+                .filter((n) => n.type !== 'admin_message')
             );
           },
           () => {
@@ -557,20 +580,38 @@ export default function App() {
           }
         );
 
-        directThreadUnsub = onSnapshot(
-          doc(db, 'directThreads', fbUser.uid),
-          (snap) => {
-            if (snap.exists()) {
-              const raw = snap.data()?.unreadByUser;
-              setUnreadDirectMessagesCount(typeof raw === 'number' && raw > 0 ? raw : 0);
-            } else {
+        if (profile.role === 'admin' && fbUser.emailVerified) {
+          directThreadUnsub = onSnapshot(
+            collection(db, 'directThreads'),
+            (snap) => {
+              let sum = 0;
+              snap.docs.forEach((d) => {
+                if (d.id === fbUser.uid) return;
+                const raw = d.data()?.unreadByAdmin;
+                if (typeof raw === 'number' && raw > 0) sum += raw;
+              });
+              setUnreadDirectMessagesCount(sum);
+            },
+            () => {
               setUnreadDirectMessagesCount(0);
             }
-          },
-          () => {
-            setUnreadDirectMessagesCount(0);
-          }
-        );
+          );
+        } else {
+          directThreadUnsub = onSnapshot(
+            doc(db, 'directThreads', fbUser.uid),
+            (snap) => {
+              if (snap.exists()) {
+                const raw = snap.data()?.unreadByUser;
+                setUnreadDirectMessagesCount(typeof raw === 'number' && raw > 0 ? raw : 0);
+              } else {
+                setUnreadDirectMessagesCount(0);
+              }
+            },
+            () => {
+              setUnreadDirectMessagesCount(0);
+            }
+          );
+        }
 
         userDocUnsub = onSnapshot(
           doc(db, 'users', fbUser.uid),
@@ -830,12 +871,31 @@ export default function App() {
     };
   }, [user?.uid]);
 
+  // 3C. Keep Admin's public profile photo & name synced to siteSettings/main so users see it in Messages
+  useEffect(() => {
+    if (!user || user.role !== 'admin' || !auth.currentUser?.emailVerified) return;
+    const nextPhoto = (user.photoURL || '').trim();
+    const nextName = (user.displayName || '').trim();
+    const currentPhoto = (siteSettings.adminPhotoUrl || '').trim();
+    const currentName = (siteSettings.adminDisplayName || '').trim();
+    if (nextPhoto !== currentPhoto || nextName !== currentName) {
+      syncAdminPublicAvatar({ displayName: nextName, photoURL: nextPhoto });
+    }
+  }, [
+    user?.uid,
+    user?.role,
+    user?.photoURL,
+    user?.displayName,
+    siteSettings.adminPhotoUrl,
+    siteSettings.adminDisplayName,
+  ]);
+
   // Safety net: if user finishes signing in while on /login, redirect straight to their destination
   useEffect(() => {
     if (route.page !== 'login' || !authReady || !user) return;
     const target: PageRoute = pendingCheckoutPlanId
       ? { page: 'checkout', planId: pendingCheckoutPlanId }
-      : authReturnRoute && authReturnRoute.page !== 'login'
+      : authReturnRoute && authReturnRoute.page !== 'login' && authReturnRoute.page !== 'home'
         ? authReturnRoute
         : isSuperAdminEmail(user.email) ||
             isBootstrappedModeratorEmail(user.email) ||
@@ -880,10 +940,8 @@ export default function App() {
     setInterestVersion((v) => v + 1);
   };
 
-  const handleOpenProfileMessages = () => {
-    setProfileNotifTab('messages');
-    setProfileNotifTabNonce((n) => n + 1);
-    navigate({ page: 'profile' });
+  const handleOpenNotificationsPage = (tab: 'notifications' | 'messages') => {
+    navigate({ page: 'notifications', tab });
   };
 
   const handleNotificationClick = async (notif: UserNotification) => {
@@ -891,7 +949,7 @@ export default function App() {
       markNotificationRead(user.uid, notif.id).catch(() => {});
     }
     if (notif.type === 'admin_message') {
-      handleOpenProfileMessages();
+      navigate({ page: 'notifications', tab: 'messages' });
       return;
     }
     if (notif.recipeId) {
@@ -904,8 +962,7 @@ export default function App() {
     ) {
       navigate({ page: 'pricing' });
     } else {
-      setProfileNotifTab('notifications');
-      navigate({ page: 'profile' });
+      navigate({ page: 'notifications', tab: 'notifications' });
     }
   };
 
@@ -965,7 +1022,7 @@ export default function App() {
         onOpenAuth={(returnTab) => {
           navigate(
             { page: 'login' },
-            returnTab ? { returnRoute: { page: returnTab } } : undefined
+            returnTab ? { returnRoute: { page: returnTab } } : { clearReturnRoute: true }
           );
         }}
         onLogout={handleLogout}
@@ -976,9 +1033,11 @@ export default function App() {
         notifications={notifications}
         unreadDirectMessagesCount={unreadDirectMessagesCount}
         adminContactEmail={siteSettings.contactEmail}
+        adminPhotoUrl={siteSettings.adminPhotoUrl}
+        adminDisplayName={siteSettings.adminDisplayName}
         onNotificationClick={handleNotificationClick}
         onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
-        onOpenProfileMessages={handleOpenProfileMessages}
+        onOpenNotificationsPage={handleOpenNotificationsPage}
         categories={categories}
         recipes={recipes}
         selectedCategory={route.page === 'category' ? route.categoryName : selectedFilter}
@@ -1385,12 +1444,6 @@ export default function App() {
               recipes={recipes}
               plans={plans}
               siteSettings={siteSettings}
-              notifications={notifications}
-              unreadDirectMessagesCount={unreadDirectMessagesCount}
-              initialNotifTab={profileNotifTab}
-              initialNotifTabNonce={profileNotifTabNonce}
-              onNotificationClick={handleNotificationClick}
-              onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
               onLogout={handleLogout}
               onNavigate={(next) =>
                 next.page === 'login'
@@ -1424,6 +1477,39 @@ export default function App() {
               }
               onLogout={handleLogout}
               onToast={showToast}
+            />
+          )
+        )}
+
+        {/* PAGE 13C: DEDICATED NOTIFICATIONS & MESSAGES PAGE */}
+        {route.page === 'notifications' && (
+          !authReady ? (
+            <div className="min-h-[50vh] flex items-center justify-center px-4">
+              <div className="w-8 h-8 rounded-full border-2 border-[#1B4D24]/20 border-t-[#1B4D24] animate-spin" />
+            </div>
+          ) : (
+            <NotificationsMessagesPage
+              user={user}
+              siteSettings={siteSettings}
+              notifications={notifications}
+              unreadDirectMessagesCount={unreadDirectMessagesCount}
+              activeTab={route.tab === 'messages' ? 'messages' : 'notifications'}
+              onTabChange={(tab) => navigate({ page: 'notifications', tab })}
+              onNotificationClick={handleNotificationClick}
+              onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+              onNavigate={(next) =>
+                next.page === 'login'
+                  ? navigate(
+                      { page: 'login' },
+                      {
+                        returnRoute: {
+                          page: 'notifications',
+                          tab: route.tab === 'messages' ? 'messages' : 'notifications',
+                        },
+                      }
+                    )
+                  : navigate(next)
+              }
             />
           )
         )}
